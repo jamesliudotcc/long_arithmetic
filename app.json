@@ -1,0 +1,13 @@
+{
+	"expo": {
+		"name": "Long Arithmetic",
+		"slug": "long-arithmetic",
+		"version": "1.0.0",
+		"orientation": "portrait",
+		"platforms": ["web"],
+		"web": {
+			"bundler": "metro",
+			"output": "static"
+		}
+	}
+}
