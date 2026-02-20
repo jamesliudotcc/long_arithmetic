@@ -1,5 +1,5 @@
 import { colors, radius, spacing } from "@react/theme";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 const DISC_SIZE = 36;
 const DISC_GAP = spacing.sm;
@@ -21,9 +21,10 @@ type PlaceDiscsProps = {
 	locked: boolean;
 	canCarry: boolean;
 	onDiskPointerDown?: (e: React.PointerEvent, diskIndex: number) => void;
-	onCarry: () => void;
+	isDragSource?: boolean;
+	onCarryDragStart?: () => void;
+	onCarryDragEnd?: () => void;
 	testID?: string;
-	carryBtnTestID?: string;
 	diskTestIDPrefix?: string;
 };
 
@@ -34,21 +35,33 @@ export function PlaceDiscs({
 	solved,
 	locked,
 	canCarry,
+	isDragSource,
 	onDiskPointerDown,
-	onCarry,
+	onCarryDragStart,
+	onCarryDragEnd,
 	testID,
-	carryBtnTestID,
 	diskTestIDPrefix,
 }: PlaceDiscsProps) {
 	const discColor = color;
 
+	function handleGridPointerDown(e: React.PointerEvent) {
+		if (!canCarry) return;
+		// Release capture so pointerup fires on whatever element the pointer lands on
+		(e.currentTarget as unknown as Element).releasePointerCapture(e.pointerId);
+		onCarryDragStart?.();
+	}
+
 	return (
 		<View style={styles.wrapper}>
 			<View
-				style={[styles.discGrid, canCarry && styles.discGridCarry]}
-				// @ts-ignore — web-only data-testid
+				style={[styles.discGrid, canCarry && styles.discGridCarry, isDragSource && styles.discGridDragSource]}
+				// @ts-ignore — web-only
 				data-testid={testID}
 				testID={testID}
+				// @ts-ignore — web pointer event
+				onPointerDown={canCarry ? handleGridPointerDown : undefined}
+				// @ts-ignore — web pointer event
+				onPointerUp={canCarry ? onCarryDragEnd : undefined}
 			>
 				{Array.from({ length: count }, (_, i) => {
 					const diskTestID = diskTestIDPrefix
@@ -64,7 +77,7 @@ export function PlaceDiscs({
 							testID={diskTestID}
 							// @ts-ignore — web pointer event
 							onPointerDown={
-								!locked && onDiskPointerDown
+								!locked && !canCarry && onDiskPointerDown
 									? (e: React.PointerEvent) => onDiskPointerDown(e, i)
 									: undefined
 							}
@@ -74,17 +87,6 @@ export function PlaceDiscs({
 					);
 				})}
 			</View>
-			{canCarry && !locked && (
-				<Pressable
-					style={styles.carryBtn}
-					onPress={onCarry}
-					// @ts-ignore — web-only
-					data-testid={carryBtnTestID}
-					testID={carryBtnTestID}
-				>
-					<Text style={styles.carryBtnText}>carry →</Text>
-				</Pressable>
-			)}
 		</View>
 	);
 }
@@ -108,6 +110,11 @@ const styles = StyleSheet.create({
 	discGridCarry: {
 		borderColor: "#f39c12",
 		borderWidth: 2,
+		// @ts-ignore — web-only
+		cursor: "grab",
+	},
+	discGridDragSource: {
+		opacity: 0.4,
 	},
 	disc: {
 		width: DISC_SIZE,
@@ -120,16 +127,5 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		fontWeight: "700",
 		color: "#fff",
-	},
-	carryBtn: {
-		paddingVertical: 2,
-		paddingHorizontal: spacing.xs,
-		borderRadius: radius.sm,
-		backgroundColor: "#f39c12",
-	},
-	carryBtnText: {
-		fontSize: 11,
-		color: "#fff",
-		fontWeight: "600",
 	},
 });

@@ -58,10 +58,19 @@ async function solveColumn(page: Page, place: string) {
 		await expect.poll(() => diskCount(page, "bottom", place)).toBe(bottom - 1);
 		bottom--;
 	}
-	// Carry out complete 10-sets
+	// Carry out complete 10-sets by dragging zone onto the next column
+	const CARRY_TARGET: Record<string, string> = {
+		ones_pl: "tens_pl",
+		tens_pl: "hundreds_pl",
+		hundreds_pl: "thousands_pl",
+		thousands_pl: "overflow",
+	};
 	let top = await diskCount(page, "top", place);
 	while (top >= 10) {
-		await page.getByTestId(`visual-carry-btn-${place}-top`).click();
+		const target = CARRY_TARGET[place];
+		await page
+			.getByTestId(`visual-zone-top-${place}`)
+			.dragTo(page.getByTestId(`visual-column-${target}`));
 		await expect.poll(() => diskCount(page, "top", place)).toBe(top - 10);
 		top -= 10;
 	}
@@ -116,7 +125,7 @@ test.describe("Visual mode", () => {
 			.toBe(otherBefore + 1);
 	});
 
-	test("carry button appears when a zone reaches 10 disks, click carries 10 to next column", async ({
+	test("dragging a zone with 10 disks onto the next column carries 10", async ({
 		page,
 	}) => {
 		await switchToVisualMode(page);
@@ -131,11 +140,10 @@ test.describe("Visual mode", () => {
 			// This problem has no carry in ones — test is N/A
 			return;
 		}
-		await expect(
-			page.getByTestId("visual-carry-btn-ones_pl-top"),
-		).toBeVisible();
 		const tensBefore = await diskCount(page, "top", "tens_pl");
-		await page.getByTestId("visual-carry-btn-ones_pl-top").click();
+		await page
+			.getByTestId("visual-zone-top-ones_pl")
+			.dragTo(page.getByTestId("visual-column-tens_pl"));
 		// Ones top loses 10; tens top gains 1
 		await expect.poll(() => diskCount(page, "top", "ones_pl")).toBe(top - 10);
 		await expect
