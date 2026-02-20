@@ -94,6 +94,10 @@ export function generateAdditionProblem(
 		);
 	}
 
+	// Pick a random carry count in [0, numCarries] so that problems vary —
+	// numCarries is a maximum, not a fixed target.
+	const actualCarries = randInt(0, numCarries, random);
+
 	const pv1: PlaceValues = {
 		ones_pl: 0,
 		tens_pl: 0,
@@ -110,13 +114,13 @@ export function generateAdditionProblem(
 	for (let i = 0; i < numPlaces; i++) {
 		const place = PLACES[i];
 		const isLeading = i === numPlaces - 1;
-		const forceCarry = i < numCarries;
+		const forceCarry = i < actualCarries;
 
-		// The first non-forced column (index === numCarries) receives a guaranteed
+		// The first non-forced column (index === actualCarries) receives a guaranteed
 		// carry-in of 1 from the last forced column. We ensure non-forced columns
 		// never carry out, so all later non-forced columns receive carry-in 0.
 		const expectedCarryIn =
-			!forceCarry && i === numCarries && numCarries > 0 ? 1 : 0;
+			!forceCarry && i === actualCarries && actualCarries > 0 ? 1 : 0;
 
 		let d1: number;
 		let d2: number;

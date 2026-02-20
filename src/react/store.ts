@@ -7,6 +7,7 @@ import {
 	computeSolution,
 	generateAdditionProblem,
 } from "@domain/addition";
+import { type Attempt, createAttempt } from "@domain/attempt";
 import type { StoragePort } from "@domain/ports";
 import { InMemoryStorage } from "@infrastructure/in-memory-storage";
 import { create } from "zustand";
@@ -34,6 +35,8 @@ type State = {
 	difficulty: AdditionDifficulty;
 	solution: AdditionSolution;
 	work: WorkState;
+	attempts: Attempt[];
+	periodStart: number;
 };
 
 type Actions = {
@@ -42,23 +45,43 @@ type Actions = {
 	enterAnswer: (place: Place, digit: string) => void;
 	enterCarry: (place: Place, digit: string) => void;
 	enterFinalCarry: (digit: string) => void;
+	resetPeriod: () => void;
 };
 
 const DEFAULT_DIFFICULTY: AdditionDifficulty = { numPlaces: 3, numCarries: 2 };
 
 let _storage: StoragePort = new InMemoryStorage();
 
+function midnightToday(): number {
+	const d = new Date();
+	d.setHours(0, 0, 0, 0);
+	return d.getTime();
+}
+
 export function initializeStorage(storage: StoragePort): void {
 	_storage = storage;
-	const saved = storage.getDifficulty();
-	if (saved) {
-		const problem = generateAdditionProblem(saved);
+
+	const savedDifficulty = storage.getDifficulty();
+	const attempts = storage.getAttempts();
+	const savedPeriodStart = storage.getPeriodStart();
+	const periodStart =
+		savedPeriodStart !== null ? savedPeriodStart : midnightToday();
+	if (savedPeriodStart === null) {
+		storage.savePeriodStart(periodStart);
+	}
+
+	if (savedDifficulty) {
+		const problem = generateAdditionProblem(savedDifficulty);
 		useAdditionStore.setState({
-			difficulty: saved,
+			difficulty: savedDifficulty,
 			problem,
 			solution: computeSolution(problem),
 			work: initialWork(),
+			attempts,
+			periodStart,
 		});
+	} else {
+		useAdditionStore.setState({ attempts, periodStart });
 	}
 }
 
@@ -98,7 +121,11 @@ function advanceIfComplete(
 	const col = solution.columns[place];
 
 	const answerCorrect = entry.answerStatus === "correct";
-	const carryCorrect = col.carryOut === 0 || entry.carryStatus === "correct";
+	// The leading column's carry-out is the finalCarry, entered separately in the
+	// answer row — there is no scratch-row input for it, so skip the carry check.
+	const isLeading = index === numPlaces - 1;
+	const carryCorrect =
+		isLeading || col.carryOut === 0 || entry.carryStatus === "correct";
 	const columnComplete = answerCorrect && carryCorrect;
 
 	if (!columnComplete || index !== work.unlockedUpTo) {
@@ -115,6 +142,19 @@ function advanceIfComplete(
 	return { unlockedUpTo: numPlaces }; // unlock final carry-out column
 }
 
+function recordAttemptInternal(
+	numPlaces: 1 | 2 | 3 | 4,
+	correct: boolean,
+): void {
+	const attempt = createAttempt(numPlaces, correct);
+	_storage.saveAttempt(attempt);
+	useAdditionStore.setState(
+		(s) => ({ attempts: [...s.attempts, attempt] }),
+		false,
+		"recordAttempt" as string,
+	);
+}
+
 const initialProblem = generateAdditionProblem(DEFAULT_DIFFICULTY);
 
 export const useAdditionStore = create<State & Actions>()(
@@ -124,13 +164,19 @@ export const useAdditionStore = create<State & Actions>()(
 			problem: initialProblem,
 			solution: computeSolution(initialProblem),
 			work: initialWork(),
+			attempts: [],
+			periodStart: midnightToday(),
 
 			newProblem: () => {
-				const problem = generateAdditionProblem(get().difficulty);
+				const { work, problem } = get();
+				if (!work.solved) {
+					recordAttemptInternal(problem.numPlaces, false);
+				}
+				const newProb = generateAdditionProblem(get().difficulty);
 				set(
 					{
-						problem,
-						solution: computeSolution(problem),
+						problem: newProb,
+						solution: computeSolution(newProb),
 						work: initialWork(),
 					},
 					false,
@@ -139,6 +185,10 @@ export const useAdditionStore = create<State & Actions>()(
 			},
 
 			setDifficulty: (difficulty: AdditionDifficulty) => {
+				const { work, problem } = get();
+				if (!work.solved) {
+					recordAttemptInternal(problem.numPlaces, false);
+				}
 				const clamped: AdditionDifficulty = {
 					numPlaces: difficulty.numPlaces,
 					numCarries: Math.min(
@@ -147,12 +197,12 @@ export const useAdditionStore = create<State & Actions>()(
 					) as AdditionDifficulty["numCarries"],
 				};
 				_storage.saveDifficulty(clamped);
-				const problem = generateAdditionProblem(clamped);
+				const newProb = generateAdditionProblem(clamped);
 				set(
 					{
 						difficulty: clamped,
-						problem,
-						solution: computeSolution(problem),
+						problem: newProb,
+						solution: computeSolution(newProb),
 						work: initialWork(),
 					},
 					false,
@@ -185,6 +235,10 @@ export const useAdditionStore = create<State & Actions>()(
 					solution,
 					problem.numPlaces,
 				);
+
+				if (advance.solved === true) {
+					recordAttemptInternal(problem.numPlaces, true);
+				}
 
 				set(
 					{ work: { ...work, entries: updatedEntries, ...advance } },
@@ -219,6 +273,10 @@ export const useAdditionStore = create<State & Actions>()(
 					problem.numPlaces,
 				);
 
+				if (advance.solved === true) {
+					recordAttemptInternal(problem.numPlaces, true);
+				}
+
 				set(
 					{ work: { ...work, entries: updatedEntries, ...advance } },
 					false,
@@ -227,9 +285,14 @@ export const useAdditionStore = create<State & Actions>()(
 			},
 
 			enterFinalCarry: (digit: string) => {
-				const { solution, work } = get();
+				const { solution, work, problem } = get();
 				const correct = digit === String(solution.finalCarryOut);
 				const finalCarryStatus: CellStatus = correct ? "correct" : "incorrect";
+
+				if (correct) {
+					recordAttemptInternal(problem.numPlaces, true);
+				}
+
 				set(
 					{
 						work: {
@@ -242,6 +305,12 @@ export const useAdditionStore = create<State & Actions>()(
 					false,
 					"enterFinalCarry",
 				);
+			},
+
+			resetPeriod: () => {
+				const ts = Date.now();
+				_storage.savePeriodStart(ts);
+				set({ periodStart: ts }, false, "resetPeriod");
 			},
 		}),
 		{ name: "LongArithmetic" },

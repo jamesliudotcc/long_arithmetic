@@ -14,13 +14,14 @@ export function AdditionProblemSolver() {
 
 	const { addend1, addend2, numPlaces } = problem;
 	const { finalCarryOut } = solution;
+	const { solved } = work;
 
 	// Most-significant first (matches AdditionProblemDisplay)
 	const displayPlaces = PLACES.slice(0, numPlaces).reverse();
 
 	return (
 		<View style={styles.table}>
-			{/* Scratch row: carry-out inputs — no extra column here */}
+			{/* Scratch row: carry-out inputs — always shown so the student decides */}
 			<View style={styles.row}>
 				<DigitCell mode="empty" testID="scratch-extra-empty" />
 				{displayPlaces.map((displayPlace, displayIdx) => {
@@ -28,7 +29,7 @@ export function AdditionProblemSolver() {
 					// carry-out of column X is displayed above column X+1 (one to the left in display)
 					const sourceIndex = numPlaces - 2 - displayIdx;
 					if (sourceIndex < 0) {
-						// ones column slot → always empty
+						// ones column slot → no column below, always empty
 						return (
 							<DigitCell
 								key={displayPlace}
@@ -38,18 +39,8 @@ export function AdditionProblemSolver() {
 						);
 					}
 					const sourcePlace = PLACES[sourceIndex];
-					const colSol = solution.columns[sourcePlace];
-					if (colSol.carryOut === 0) {
-						return (
-							<DigitCell
-								key={displayPlace}
-								mode="empty"
-								testID={`scratch-empty-${displayPlace}`}
-							/>
-						);
-					}
 					const entry = work.entries[sourcePlace];
-					const locked = sourceIndex > work.unlockedUpTo;
+					const locked = solved || sourceIndex > work.unlockedUpTo;
 					return (
 						<DigitCell
 							key={displayPlace}
@@ -95,18 +86,20 @@ export function AdditionProblemSolver() {
 
 			{/* Answer row */}
 			<View style={styles.row}>
-				{/* Extra left column: always visible; only interactive when finalCarryOut > 0 */}
+				{/* Extra left column: only interactive when there is an overflow carry */}
 				<DigitCell
 					mode="input"
 					value={work.finalCarry}
 					status={work.finalCarryStatus}
-					locked={finalCarryOut === 0 || work.unlockedUpTo < numPlaces}
+					locked={
+						solved || finalCarryOut === 0 || work.unlockedUpTo < numPlaces
+					}
 					onChangeText={enterFinalCarry}
 					testID="final-carry-answer"
 				/>
 				{displayPlaces.map((place, displayIdx) => {
 					const index = numPlaces - 1 - displayIdx;
-					const locked = index > work.unlockedUpTo;
+					const locked = solved || index > work.unlockedUpTo;
 					const entry = work.entries[place];
 					return (
 						<DigitCell

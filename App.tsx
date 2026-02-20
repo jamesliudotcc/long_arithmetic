@@ -1,9 +1,11 @@
 import { AdditionProblemSolver } from "@react/AdditionProblemSolver";
 import { AdminPanel } from "@react/AdminPanel";
+import { CollapsibleSection } from "@react/CollapsibleSection";
+import { StatsPanel } from "@react/StatsPanel";
 import { useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 type Screen = "quiz" | "admin";
 
@@ -41,9 +43,17 @@ export default function App() {
 					</Pressable>
 				</>
 			) : (
-				<View style={styles.problemCard}>
-					<AdminPanel />
-				</View>
+				<ScrollView
+					style={styles.adminScroll}
+					contentContainerStyle={styles.adminContent}
+				>
+					<CollapsibleSection title="Settings" defaultOpen>
+						<AdminPanel />
+					</CollapsibleSection>
+					<CollapsibleSection title="Statistics">
+						<StatsPanel />
+					</CollapsibleSection>
+				</ScrollView>
 			)}
 		</View>
 	);
@@ -95,5 +105,12 @@ const styles = StyleSheet.create({
 		color: colors.background,
 		fontSize: typography.fontSize.lg,
 		fontWeight: typography.fontWeight.semibold,
+	},
+	adminScroll: {
+		width: "100%",
+	},
+	adminContent: {
+		gap: spacing.md,
+		paddingVertical: spacing.sm,
 	},
 });
