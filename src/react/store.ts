@@ -9,11 +9,20 @@ import {
 } from "@domain/addition";
 import { type Attempt, createAttempt } from "@domain/attempt";
 import type { StoragePort } from "@domain/ports";
+import {
+	type VisualWorkState,
+	type VisualZone,
+	applyCarryOut,
+	applyMoveDisk,
+	initialVisualWork,
+} from "@domain/visual-addition";
 import { InMemoryStorage } from "@infrastructure/in-memory-storage";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 
 export type CellStatus = "idle" | "correct" | "incorrect";
+
+export type Mode = "digit" | "visual";
 
 type PlaceWorkEntry = {
 	answer: string; // "" | "0"–"9"
@@ -35,6 +44,8 @@ type State = {
 	difficulty: AdditionDifficulty;
 	solution: AdditionSolution;
 	work: WorkState;
+	visualWork: VisualWorkState;
+	mode: Mode;
 	attempts: Attempt[];
 	periodStart: number;
 };
@@ -46,6 +57,9 @@ type Actions = {
 	enterCarry: (place: Place, digit: string) => void;
 	enterFinalCarry: (digit: string) => void;
 	resetPeriod: () => void;
+	setMode: (mode: Mode) => void;
+	moveVisualDisk: (place: Place, from: VisualZone) => void;
+	carryVisual: (place: Place, zone: VisualZone) => void;
 };
 
 const DEFAULT_DIFFICULTY: AdditionDifficulty = { numPlaces: 3, numCarries: 2 };
@@ -77,6 +91,7 @@ export function initializeStorage(storage: StoragePort): void {
 			problem,
 			solution: computeSolution(problem),
 			work: initialWork(),
+			visualWork: initialVisualWork(problem),
 			attempts,
 			periodStart,
 		});
@@ -164,12 +179,16 @@ export const useAdditionStore = create<State & Actions>()(
 			problem: initialProblem,
 			solution: computeSolution(initialProblem),
 			work: initialWork(),
+			visualWork: initialVisualWork(initialProblem),
+			mode: "digit" as Mode,
 			attempts: [],
 			periodStart: midnightToday(),
 
 			newProblem: () => {
-				const { work, problem } = get();
-				if (!work.solved) {
+				const { work, visualWork, problem, mode } = get();
+				const activeModeSolved =
+					mode === "visual" ? visualWork.solved : work.solved;
+				if (!activeModeSolved) {
 					recordAttemptInternal(problem.numPlaces, false);
 				}
 				const newProb = generateAdditionProblem(get().difficulty);
@@ -178,6 +197,7 @@ export const useAdditionStore = create<State & Actions>()(
 						problem: newProb,
 						solution: computeSolution(newProb),
 						work: initialWork(),
+						visualWork: initialVisualWork(newProb),
 					},
 					false,
 					"newProblem",
@@ -185,8 +205,10 @@ export const useAdditionStore = create<State & Actions>()(
 			},
 
 			setDifficulty: (difficulty: AdditionDifficulty) => {
-				const { work, problem } = get();
-				if (!work.solved) {
+				const { work, visualWork, problem, mode } = get();
+				const activeModeSolved =
+					mode === "visual" ? visualWork.solved : work.solved;
+				if (!activeModeSolved) {
 					recordAttemptInternal(problem.numPlaces, false);
 				}
 				const clamped: AdditionDifficulty = {
@@ -204,6 +226,7 @@ export const useAdditionStore = create<State & Actions>()(
 						problem: newProb,
 						solution: computeSolution(newProb),
 						work: initialWork(),
+						visualWork: initialVisualWork(newProb),
 					},
 					false,
 					"setDifficulty",
@@ -311,6 +334,38 @@ export const useAdditionStore = create<State & Actions>()(
 				const ts = Date.now();
 				_storage.savePeriodStart(ts);
 				set({ periodStart: ts }, false, "resetPeriod");
+			},
+
+			setMode: (mode: Mode) => {
+				set({ mode }, false, "setMode");
+			},
+
+			moveVisualDisk: (place: Place, from: VisualZone) => {
+				const { visualWork, problem } = get();
+				const newWork = applyMoveDisk(
+					visualWork,
+					place,
+					from,
+					problem.numPlaces,
+				);
+				if (newWork.solved && !visualWork.solved) {
+					recordAttemptInternal(problem.numPlaces, true);
+				}
+				set({ visualWork: newWork }, false, "moveVisualDisk");
+			},
+
+			carryVisual: (place: Place, zone: VisualZone) => {
+				const { visualWork, problem } = get();
+				const newWork = applyCarryOut(
+					visualWork,
+					place,
+					zone,
+					problem.numPlaces,
+				);
+				if (newWork.solved && !visualWork.solved) {
+					recordAttemptInternal(problem.numPlaces, true);
+				}
+				set({ visualWork: newWork }, false, "carryVisual");
 			},
 		}),
 		{ name: "LongArithmetic" },

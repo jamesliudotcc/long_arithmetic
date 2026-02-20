@@ -20,7 +20,12 @@ export function AdditionProblemSolver() {
 	const displayPlaces = PLACES.slice(0, numPlaces).reverse();
 
 	return (
-		<View style={styles.table}>
+		<View
+			style={styles.table}
+			// @ts-ignore — web-only
+			data-testid="addition-problem-solver"
+			testID="addition-problem-solver"
+		>
 			{/* Scratch row: carry-out inputs — always shown so the student decides */}
 			<View style={styles.row}>
 				<DigitCell mode="empty" testID="scratch-extra-empty" />

@@ -1,5 +1,5 @@
 import type { AdditionDifficulty } from "@domain/addition";
-import { useAdditionStore } from "@react/store";
+import { type Mode, useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -8,6 +8,8 @@ const NUM_PLACES_OPTIONS = [1, 2, 3, 4] as const;
 export function AdminPanel() {
 	const difficulty = useAdditionStore((s) => s.difficulty);
 	const setDifficulty = useAdditionStore((s) => s.setDifficulty);
+	const mode = useAdditionStore((s) => s.mode);
+	const setMode = useAdditionStore((s) => s.setMode);
 
 	const numCarriesOptions = Array.from(
 		{ length: difficulty.numPlaces + 1 },
@@ -87,6 +89,35 @@ export function AdminPanel() {
 				</View>
 			</View>
 
+			<View style={styles.section}>
+				<Text style={styles.label}>Mode</Text>
+				<View style={styles.buttonRow}>
+					{(["digit", "visual"] as Mode[]).map((m) => (
+						<Pressable
+							key={m}
+							style={[
+								styles.optionButton,
+								styles.modeButton,
+								mode === m && styles.optionButtonActive,
+							]}
+							onPress={() => setMode(m)}
+							// @ts-ignore — web-only
+							data-testid={`mode-btn-${m}`}
+							testID={`mode-btn-${m}`}
+						>
+							<Text
+								style={[
+									styles.optionText,
+									mode === m && styles.optionTextActive,
+								]}
+							>
+								{m === "digit" ? "Digit" : "Visual"}
+							</Text>
+						</Pressable>
+					))}
+				</View>
+			</View>
+
 			<Pressable style={styles.resetButton} onPress={handleReset}>
 				<Text style={styles.resetText}>Reset to Defaults</Text>
 			</Pressable>
@@ -124,6 +155,9 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.background,
 		alignItems: "center",
 		justifyContent: "center",
+	},
+	modeButton: {
+		width: 72,
 	},
 	optionButtonActive: {
 		backgroundColor: colors.primary,

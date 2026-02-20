@@ -2,6 +2,7 @@ import { AdditionProblemSolver } from "@react/AdditionProblemSolver";
 import { AdminPanel } from "@react/AdminPanel";
 import { CollapsibleSection } from "@react/CollapsibleSection";
 import { StatsPanel } from "@react/StatsPanel";
+import { VisualProblemSolver } from "@react/VisualProblemSolver";
 import { useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
 import { useState } from "react";
@@ -12,6 +13,7 @@ type Screen = "quiz" | "admin";
 export default function App() {
 	const [screen, setScreen] = useState<Screen>("quiz");
 	const newProblem = useAdditionStore((s) => s.newProblem);
+	const mode = useAdditionStore((s) => s.mode);
 
 	return (
 		<View style={styles.container}>
@@ -20,6 +22,9 @@ export default function App() {
 				<Pressable
 					style={styles.iconButton}
 					onPress={() => setScreen(screen === "quiz" ? "admin" : "quiz")}
+					// @ts-ignore — web-only
+					data-testid="settings-btn"
+					testID="settings-btn"
 				>
 					<Text style={styles.iconButtonText}>
 						{screen === "quiz" ? "⚙" : "✕"}
@@ -30,7 +35,11 @@ export default function App() {
 			{screen === "quiz" ? (
 				<>
 					<View style={styles.problemCard}>
-						<AdditionProblemSolver />
+						{mode === "visual" ? (
+							<VisualProblemSolver />
+						) : (
+							<AdditionProblemSolver />
+						)}
 					</View>
 					<Pressable
 						style={({ pressed }) => [
