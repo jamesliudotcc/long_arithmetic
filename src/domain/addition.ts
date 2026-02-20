@@ -43,6 +43,46 @@ function randInt(min: number, max: number, random: () => number): number {
 	return Math.floor(random() * (max - min + 1)) + min;
 }
 
+export type ColumnSolution = {
+	carryIn: number; // 0 or 1
+	rawSum: number; // d1 + d2 + carryIn
+	answerDigit: number; // rawSum % 10
+	carryOut: number; // Math.floor(rawSum / 10)
+};
+
+export type AdditionSolution = {
+	columns: Record<Place, ColumnSolution>;
+	finalCarryOut: number; // carry out of the leading active column (0 or 1)
+};
+
+export function computeSolution(problem: AdditionProblem): AdditionSolution {
+	const zero: ColumnSolution = {
+		carryIn: 0,
+		rawSum: 0,
+		answerDigit: 0,
+		carryOut: 0,
+	};
+	const columns: Record<Place, ColumnSolution> = {
+		ones_pl: { ...zero },
+		tens_pl: { ...zero },
+		hundreds_pl: { ...zero },
+		thousands_pl: { ...zero },
+	};
+	let carry = 0;
+	for (let i = 0; i < problem.numPlaces; i++) {
+		const place = PLACES[i];
+		const raw = problem.addend1[place] + problem.addend2[place] + carry;
+		columns[place] = {
+			carryIn: carry,
+			rawSum: raw,
+			answerDigit: raw % 10,
+			carryOut: Math.floor(raw / 10),
+		};
+		carry = columns[place].carryOut;
+	}
+	return { columns, finalCarryOut: carry };
+}
+
 export function generateAdditionProblem(
 	difficulty: AdditionDifficulty,
 	random: () => number = Math.random,

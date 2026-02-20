@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
 	type AdditionProblem,
 	PLACES,
+	computeSolution,
 	decompose,
 	generateAdditionProblem,
 	toNumber,
@@ -131,5 +132,138 @@ describe("generateAdditionProblem", () => {
 			expect(p.addend2.hundreds_pl).toBe(0);
 			expect(p.addend2.thousands_pl).toBe(0);
 		}
+	});
+});
+
+describe("computeSolution", () => {
+	it("1-digit no carry: 3+4=7 → answerDigit=7, carryOut=0, finalCarryOut=0", () => {
+		const p: AdditionProblem = {
+			addend1: { ones_pl: 3, tens_pl: 0, hundreds_pl: 0, thousands_pl: 0 },
+			addend2: { ones_pl: 4, tens_pl: 0, hundreds_pl: 0, thousands_pl: 0 },
+			numPlaces: 1,
+		};
+		const sol = computeSolution(p);
+		expect(sol.columns.ones_pl.answerDigit).toBe(7);
+		expect(sol.columns.ones_pl.carryOut).toBe(0);
+		expect(sol.columns.ones_pl.carryIn).toBe(0);
+		expect(sol.finalCarryOut).toBe(0);
+	});
+
+	it("inactive places remain zero-filled (numPlaces=1)", () => {
+		const p: AdditionProblem = {
+			addend1: { ones_pl: 5, tens_pl: 0, hundreds_pl: 0, thousands_pl: 0 },
+			addend2: { ones_pl: 2, tens_pl: 0, hundreds_pl: 0, thousands_pl: 0 },
+			numPlaces: 1,
+		};
+		const sol = computeSolution(p);
+		expect(sol.columns.tens_pl).toEqual({
+			carryIn: 0,
+			rawSum: 0,
+			answerDigit: 0,
+			carryOut: 0,
+		});
+		expect(sol.columns.hundreds_pl).toEqual({
+			carryIn: 0,
+			rawSum: 0,
+			answerDigit: 0,
+			carryOut: 0,
+		});
+		expect(sol.columns.thousands_pl).toEqual({
+			carryIn: 0,
+			rawSum: 0,
+			answerDigit: 0,
+			carryOut: 0,
+		});
+	});
+
+	it("2-digit carry from ones: 19+13=32 → ones carryOut=1, tens carryIn=1, finalCarryOut=0", () => {
+		const p: AdditionProblem = {
+			addend1: { ones_pl: 9, tens_pl: 1, hundreds_pl: 0, thousands_pl: 0 },
+			addend2: { ones_pl: 3, tens_pl: 1, hundreds_pl: 0, thousands_pl: 0 },
+			numPlaces: 2,
+		};
+		const sol = computeSolution(p);
+		expect(sol.columns.ones_pl.carryOut).toBe(1);
+		expect(sol.columns.tens_pl.carryIn).toBe(1);
+		expect(sol.columns.tens_pl.answerDigit).toBe(3);
+		expect(sol.finalCarryOut).toBe(0);
+	});
+
+	it("3-digit carry chain: 342+189=531 (carry propagates through all columns)", () => {
+		const p: AdditionProblem = {
+			addend1: { ones_pl: 2, tens_pl: 4, hundreds_pl: 3, thousands_pl: 0 },
+			addend2: { ones_pl: 9, tens_pl: 8, hundreds_pl: 1, thousands_pl: 0 },
+			numPlaces: 3,
+		};
+		const sol = computeSolution(p);
+		// ones: 2+9=11 → digit=1, carryOut=1
+		expect(sol.columns.ones_pl.answerDigit).toBe(1);
+		expect(sol.columns.ones_pl.carryOut).toBe(1);
+		// tens: 4+8+1=13 → digit=3, carryOut=1
+		expect(sol.columns.tens_pl.carryIn).toBe(1);
+		expect(sol.columns.tens_pl.answerDigit).toBe(3);
+		expect(sol.columns.tens_pl.carryOut).toBe(1);
+		// hundreds: 3+1+1=5 → digit=5, carryOut=0
+		expect(sol.columns.hundreds_pl.carryIn).toBe(1);
+		expect(sol.columns.hundreds_pl.answerDigit).toBe(5);
+		expect(sol.columns.hundreds_pl.carryOut).toBe(0);
+		expect(sol.finalCarryOut).toBe(0);
+	});
+
+	it("finalCarryOut=1: 99+11=110 (leading column overflows)", () => {
+		const p: AdditionProblem = {
+			addend1: { ones_pl: 9, tens_pl: 9, hundreds_pl: 0, thousands_pl: 0 },
+			addend2: { ones_pl: 1, tens_pl: 1, hundreds_pl: 0, thousands_pl: 0 },
+			numPlaces: 2,
+		};
+		const sol = computeSolution(p);
+		expect(sol.finalCarryOut).toBe(1);
+		expect(sol.columns.ones_pl.answerDigit).toBe(0);
+		expect(sol.columns.tens_pl.answerDigit).toBe(1);
+	});
+
+	it("4-digit no carries: 1111+2222=3333 (all carryIn/carryOut are 0)", () => {
+		const p: AdditionProblem = {
+			addend1: {
+				ones_pl: 1,
+				tens_pl: 1,
+				hundreds_pl: 1,
+				thousands_pl: 1,
+			},
+			addend2: {
+				ones_pl: 2,
+				tens_pl: 2,
+				hundreds_pl: 2,
+				thousands_pl: 2,
+			},
+			numPlaces: 4,
+		};
+		const sol = computeSolution(p);
+		for (const place of PLACES) {
+			expect(sol.columns[place].carryIn).toBe(0);
+			expect(sol.columns[place].carryOut).toBe(0);
+			expect(sol.columns[place].answerDigit).toBe(3);
+		}
+		expect(sol.finalCarryOut).toBe(0);
+	});
+
+	it("4-digit finalCarryOut=1: 9999+1001 → finalCarryOut=1", () => {
+		const p: AdditionProblem = {
+			addend1: {
+				ones_pl: 9,
+				tens_pl: 9,
+				hundreds_pl: 9,
+				thousands_pl: 9,
+			},
+			addend2: {
+				ones_pl: 1,
+				tens_pl: 0,
+				hundreds_pl: 0,
+				thousands_pl: 1,
+			},
+			numPlaces: 4,
+		};
+		const sol = computeSolution(p);
+		expect(sol.finalCarryOut).toBe(1);
 	});
 });

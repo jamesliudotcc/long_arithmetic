@@ -1,17 +1,16 @@
-import { AdditionProblemDisplay } from "@react/AdditionProblemDisplay";
+import { AdditionProblemSolver } from "@react/AdditionProblemSolver";
 import { useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function App() {
-	const problem = useAdditionStore((s) => s.problem);
 	const newProblem = useAdditionStore((s) => s.newProblem);
 
 	return (
 		<View style={styles.container}>
 			<Text style={styles.title}>Long Arithmetic</Text>
 			<View style={styles.problemCard}>
-				<AdditionProblemDisplay problem={problem} />
+				<AdditionProblemSolver />
 			</View>
 			<Pressable
 				style={({ pressed }) => [
