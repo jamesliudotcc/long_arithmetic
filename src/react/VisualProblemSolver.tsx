@@ -1,7 +1,7 @@
 import { PLACES, type Place } from "@domain/addition";
 import { canCarry as domainCanCarry } from "@domain/visual-addition";
 import type { VisualZone } from "@domain/visual-addition";
-import { TenFrame } from "@react/TenFrame";
+import { PlaceDiscs } from "@react/PlaceDiscs";
 import { useAdditionStore } from "@react/store";
 import { colors, spacing, typography } from "@react/theme";
 import { StyleSheet, Text, View } from "react-native";
@@ -12,6 +12,14 @@ const PLACE_COLORS: Record<Place | "overflow", string> = {
 	hundreds_pl: "#e67e22",
 	thousands_pl: "#9b59b6",
 	overflow: "#e74c3c",
+};
+
+const PLACE_DENOMINATIONS: Record<Place | "overflow", string> = {
+	ones_pl: "1",
+	tens_pl: "10",
+	hundreds_pl: "100",
+	thousands_pl: "1k",
+	overflow: "10k",
 };
 
 const PLACE_LABELS: Record<Place | "overflow", string> = {
@@ -88,8 +96,9 @@ export function VisualProblemSolver() {
 				<Text style={[styles.columnLabel, isDone && styles.labelDone]}>
 					{label}
 				</Text>
-				<TenFrame
+				<PlaceDiscs
 					count={col.top}
+					denomination={PLACE_DENOMINATIONS[place]}
 					color={color}
 					solved={colSolved}
 					locked={locked}
@@ -101,8 +110,9 @@ export function VisualProblemSolver() {
 					diskTestIDPrefix={`visual-disk-top-${place}`}
 				/>
 				<View style={styles.zoneSep} />
-				<TenFrame
+				<PlaceDiscs
 					count={col.bottom}
+					denomination={PLACE_DENOMINATIONS[place]}
 					color={color}
 					solved={colSolved}
 					locked={locked}
@@ -154,7 +164,7 @@ const styles = StyleSheet.create({
 	},
 	columnsRow: {
 		flexDirection: "row",
-		gap: spacing.md,
+		gap: spacing.xl,
 		alignItems: "flex-start",
 	},
 	column: {
@@ -173,7 +183,7 @@ const styles = StyleSheet.create({
 		color: colors.success,
 	},
 	zoneSep: {
-		height: 8,
+		height: spacing.md,
 	},
 	overflowDisk: {
 		width: 44,
@@ -182,9 +192,9 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 	},
 	overflowCircle: {
-		width: 32,
-		height: 32,
-		borderRadius: 16,
+		width: 36,
+		height: 36,
+		borderRadius: 18,
 		borderWidth: 2,
 		borderColor: PLACE_COLORS.overflow,
 	},
