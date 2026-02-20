@@ -112,6 +112,12 @@ export function generateAdditionProblem(
 		const isLeading = i === numPlaces - 1;
 		const forceCarry = i < numCarries;
 
+		// The first non-forced column (index === numCarries) receives a guaranteed
+		// carry-in of 1 from the last forced column. We ensure non-forced columns
+		// never carry out, so all later non-forced columns receive carry-in 0.
+		const expectedCarryIn =
+			!forceCarry && i === numCarries && numCarries > 0 ? 1 : 0;
+
 		let d1: number;
 		let d2: number;
 
@@ -120,11 +126,11 @@ export function generateAdditionProblem(
 			const d2Min = isLeading ? Math.max(1, 10 - d1) : Math.max(0, 10 - d1);
 			d2 = randInt(d2Min, 9, random);
 		} else if (isLeading) {
-			d1 = randInt(1, 8, random);
-			d2 = randInt(1, 9 - d1, random);
+			d1 = randInt(1, 8 - expectedCarryIn, random);
+			d2 = randInt(1, 9 - expectedCarryIn - d1, random);
 		} else {
-			d1 = randInt(0, 9, random);
-			d2 = randInt(0, 9 - d1, random);
+			d1 = randInt(0, 9 - expectedCarryIn, random);
+			d2 = randInt(0, 9 - expectedCarryIn - d1, random);
 		}
 
 		pv1[place] = d1;

@@ -7,6 +7,8 @@ import {
 	computeSolution,
 	generateAdditionProblem,
 } from "@domain/addition";
+import type { StoragePort } from "@domain/ports";
+import { InMemoryStorage } from "@infrastructure/in-memory-storage";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 
@@ -36,12 +38,29 @@ type State = {
 
 type Actions = {
 	newProblem: () => void;
+	setDifficulty: (difficulty: AdditionDifficulty) => void;
 	enterAnswer: (place: Place, digit: string) => void;
 	enterCarry: (place: Place, digit: string) => void;
 	enterFinalCarry: (digit: string) => void;
 };
 
 const DEFAULT_DIFFICULTY: AdditionDifficulty = { numPlaces: 3, numCarries: 2 };
+
+let _storage: StoragePort = new InMemoryStorage();
+
+export function initializeStorage(storage: StoragePort): void {
+	_storage = storage;
+	const saved = storage.getDifficulty();
+	if (saved) {
+		const problem = generateAdditionProblem(saved);
+		useAdditionStore.setState({
+			difficulty: saved,
+			problem,
+			solution: computeSolution(problem),
+			work: initialWork(),
+		});
+	}
+}
 
 function emptyEntry(): PlaceWorkEntry {
 	return {
@@ -119,9 +138,30 @@ export const useAdditionStore = create<State & Actions>()(
 				);
 			},
 
+			setDifficulty: (difficulty: AdditionDifficulty) => {
+				const clamped: AdditionDifficulty = {
+					numPlaces: difficulty.numPlaces,
+					numCarries: Math.min(
+						difficulty.numCarries,
+						difficulty.numPlaces,
+					) as AdditionDifficulty["numCarries"],
+				};
+				_storage.saveDifficulty(clamped);
+				const problem = generateAdditionProblem(clamped);
+				set(
+					{
+						difficulty: clamped,
+						problem,
+						solution: computeSolution(problem),
+						work: initialWork(),
+					},
+					false,
+					"setDifficulty",
+				);
+			},
+
 			enterAnswer: (place: Place, digit: string) => {
-				const { solution, work } = get();
-				const { problem } = get();
+				const { solution, work, problem } = get();
 				const index = PLACES.indexOf(place);
 				if (index > work.unlockedUpTo) return;
 
@@ -147,13 +187,7 @@ export const useAdditionStore = create<State & Actions>()(
 				);
 
 				set(
-					{
-						work: {
-							...work,
-							entries: updatedEntries,
-							...advance,
-						},
-					},
+					{ work: { ...work, entries: updatedEntries, ...advance } },
 					false,
 					"enterAnswer",
 				);
@@ -186,13 +220,7 @@ export const useAdditionStore = create<State & Actions>()(
 				);
 
 				set(
-					{
-						work: {
-							...work,
-							entries: updatedEntries,
-							...advance,
-						},
-					},
+					{ work: { ...work, entries: updatedEntries, ...advance } },
 					false,
 					"enterCarry",
 				);
@@ -202,14 +230,13 @@ export const useAdditionStore = create<State & Actions>()(
 				const { solution, work } = get();
 				const correct = digit === String(solution.finalCarryOut);
 				const finalCarryStatus: CellStatus = correct ? "correct" : "incorrect";
-				const solved = correct;
 				set(
 					{
 						work: {
 							...work,
 							finalCarry: digit,
 							finalCarryStatus,
-							solved,
+							solved: correct,
 						},
 					},
 					false,

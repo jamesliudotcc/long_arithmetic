@@ -1,26 +1,50 @@
 import { AdditionProblemSolver } from "@react/AdditionProblemSolver";
+import { AdminPanel } from "@react/AdminPanel";
 import { useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+type Screen = "quiz" | "admin";
+
 export default function App() {
+	const [screen, setScreen] = useState<Screen>("quiz");
 	const newProblem = useAdditionStore((s) => s.newProblem);
 
 	return (
 		<View style={styles.container}>
-			<Text style={styles.title}>Long Arithmetic</Text>
-			<View style={styles.problemCard}>
-				<AdditionProblemSolver />
+			<View style={styles.header}>
+				<Text style={styles.title}>Long Arithmetic</Text>
+				<Pressable
+					style={styles.iconButton}
+					onPress={() => setScreen(screen === "quiz" ? "admin" : "quiz")}
+				>
+					<Text style={styles.iconButtonText}>
+						{screen === "quiz" ? "⚙" : "✕"}
+					</Text>
+				</Pressable>
 			</View>
-			<Pressable
-				style={({ pressed }) => [
-					styles.button,
-					pressed && styles.buttonPressed,
-				]}
-				onPress={newProblem}
-			>
-				<Text style={styles.buttonText}>New Problem</Text>
-			</Pressable>
+
+			{screen === "quiz" ? (
+				<>
+					<View style={styles.problemCard}>
+						<AdditionProblemSolver />
+					</View>
+					<Pressable
+						style={({ pressed }) => [
+							styles.button,
+							pressed && styles.buttonPressed,
+						]}
+						onPress={newProblem}
+					>
+						<Text style={styles.buttonText}>New Problem</Text>
+					</Pressable>
+				</>
+			) : (
+				<View style={styles.problemCard}>
+					<AdminPanel />
+				</View>
+			)}
 		</View>
 	);
 }
@@ -34,10 +58,22 @@ const styles = StyleSheet.create({
 		padding: spacing.md,
 		gap: spacing.xl,
 	},
+	header: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: spacing.md,
+	},
 	title: {
 		fontSize: typography.fontSize["2xl"],
 		fontWeight: typography.fontWeight.bold,
 		color: colors.text,
+	},
+	iconButton: {
+		padding: spacing.sm,
+	},
+	iconButtonText: {
+		fontSize: typography.fontSize.xl,
+		color: colors.textMuted,
 	},
 	problemCard: {
 		backgroundColor: colors.surface,

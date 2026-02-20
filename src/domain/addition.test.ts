@@ -123,6 +123,34 @@ describe("generateAdditionProblem", () => {
 		}
 	});
 
+	it("finalCarryOut is 0 when numCarries < numPlaces (200 iterations each)", () => {
+		const cases = [
+			{ numPlaces: 2, numCarries: 1 },
+			{ numPlaces: 3, numCarries: 1 },
+			{ numPlaces: 3, numCarries: 2 },
+			{ numPlaces: 4, numCarries: 1 },
+			{ numPlaces: 4, numCarries: 2 },
+			{ numPlaces: 4, numCarries: 3 },
+		] as const;
+		for (const difficulty of cases) {
+			for (let iter = 0; iter < 200; iter++) {
+				const p = generateAdditionProblem(difficulty);
+				const sol = computeSolution(p);
+				expect(sol.finalCarryOut).toBe(0);
+			}
+		}
+	});
+
+	it("finalCarryOut is 1 when numCarries === numPlaces (200 iterations each)", () => {
+		for (const numPlaces of [1, 2, 3, 4] as const) {
+			for (let iter = 0; iter < 200; iter++) {
+				const p = generateAdditionProblem({ numPlaces, numCarries: numPlaces });
+				const sol = computeSolution(p);
+				expect(sol.finalCarryOut).toBe(1);
+			}
+		}
+	});
+
 	it("inactive places are always 0 (numPlaces=2, 50 iterations)", () => {
 		for (let iter = 0; iter < 50; iter++) {
 			const p = generateAdditionProblem({ numPlaces: 2, numCarries: 0 });
