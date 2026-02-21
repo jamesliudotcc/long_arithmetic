@@ -54,7 +54,11 @@ export function PlaceDiscs({
 	return (
 		<View style={styles.wrapper}>
 			<View
-				style={[styles.discGrid, canCarry && styles.discGridCarry, isDragSource && styles.discGridDragSource]}
+				style={[
+					styles.discGrid,
+					canCarry && styles.discGridCarry,
+					isDragSource && styles.discGridDragSource,
+				]}
 				// @ts-ignore — web-only
 				data-testid={testID}
 				testID={testID}

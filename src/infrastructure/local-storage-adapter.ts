@@ -1,8 +1,10 @@
 import type { AdditionDifficulty } from "@domain/addition";
 import type { Attempt } from "@domain/attempt";
 import type { StoragePort } from "@domain/ports";
+import type { SubtractionDifficulty } from "@domain/subtraction";
 
 const KEY_DIFFICULTY = "long-arithmetic:difficulty";
+const KEY_SUBTRACTION_DIFFICULTY = "long-arithmetic:subtraction_difficulty";
 const KEY_ATTEMPTS = "long-arithmetic:attempts";
 const KEY_PERIOD_START = "long-arithmetic:periodStart";
 
@@ -19,6 +21,23 @@ export class LocalStorageAdapter implements StoragePort {
 
 	saveDifficulty(difficulty: AdditionDifficulty): void {
 		localStorage.setItem(KEY_DIFFICULTY, JSON.stringify(difficulty));
+	}
+
+	getSubtractionDifficulty(): SubtractionDifficulty | null {
+		try {
+			const raw = localStorage.getItem(KEY_SUBTRACTION_DIFFICULTY);
+			if (raw === null) return null;
+			return JSON.parse(raw) as SubtractionDifficulty;
+		} catch {
+			return null;
+		}
+	}
+
+	saveSubtractionDifficulty(difficulty: SubtractionDifficulty): void {
+		localStorage.setItem(
+			KEY_SUBTRACTION_DIFFICULTY,
+			JSON.stringify(difficulty),
+		);
 	}
 
 	getAttempts(): Attempt[] {

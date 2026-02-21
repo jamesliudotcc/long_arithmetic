@@ -1,4 +1,5 @@
 import type { AdditionDifficulty } from "@domain/addition";
+import type { SubtractionDifficulty } from "@domain/subtraction";
 import { type Mode, useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -8,6 +9,13 @@ const NUM_PLACES_OPTIONS = [1, 2, 3, 4] as const;
 export function AdminPanel() {
 	const difficulty = useAdditionStore((s) => s.difficulty);
 	const setDifficulty = useAdditionStore((s) => s.setDifficulty);
+	const subtractionDifficulty = useAdditionStore(
+		(s) => s.subtractionDifficulty,
+	);
+	const setSubtractionDifficulty = useAdditionStore(
+		(s) => s.setSubtractionDifficulty,
+	);
+	const operation = useAdditionStore((s) => s.operation);
 	const mode = useAdditionStore((s) => s.mode);
 	const setMode = useAdditionStore((s) => s.setMode);
 
@@ -16,12 +24,25 @@ export function AdminPanel() {
 		(_, i) => i,
 	);
 
+	const numBorrowsOptions = Array.from(
+		{ length: subtractionDifficulty.numPlaces },
+		(_, i) => i,
+	);
+
 	function handleNumPlaces(n: (typeof NUM_PLACES_OPTIONS)[number]) {
-		const numCarries = Math.min(
-			difficulty.numCarries,
-			n,
-		) as AdditionDifficulty["numCarries"];
-		setDifficulty({ numPlaces: n, numCarries });
+		if (operation === "subtraction") {
+			const numBorrows = Math.min(
+				subtractionDifficulty.numBorrows,
+				n - 1,
+			) as SubtractionDifficulty["numBorrows"];
+			setSubtractionDifficulty({ numPlaces: n, numBorrows });
+		} else {
+			const numCarries = Math.min(
+				difficulty.numCarries,
+				n,
+			) as AdditionDifficulty["numCarries"];
+			setDifficulty({ numPlaces: n, numCarries });
+		}
 	}
 
 	function handleNumCarries(n: number) {
@@ -31,9 +52,20 @@ export function AdminPanel() {
 		});
 	}
 
+	function handleNumBorrows(n: number) {
+		setSubtractionDifficulty({
+			numPlaces: subtractionDifficulty.numPlaces,
+			numBorrows: n as SubtractionDifficulty["numBorrows"],
+		});
+	}
+
 	function handleReset() {
 		setDifficulty({ numPlaces: 3, numCarries: 2 });
+		setSubtractionDifficulty({ numPlaces: 3, numBorrows: 2 });
 	}
+
+	const activeDifficulty =
+		operation === "subtraction" ? subtractionDifficulty : difficulty;
 
 	return (
 		<View style={styles.panel}>
@@ -47,14 +79,14 @@ export function AdminPanel() {
 							key={n}
 							style={[
 								styles.optionButton,
-								difficulty.numPlaces === n && styles.optionButtonActive,
+								activeDifficulty.numPlaces === n && styles.optionButtonActive,
 							]}
 							onPress={() => handleNumPlaces(n)}
 						>
 							<Text
 								style={[
 									styles.optionText,
-									difficulty.numPlaces === n && styles.optionTextActive,
+									activeDifficulty.numPlaces === n && styles.optionTextActive,
 								]}
 							>
 								{n}
@@ -64,30 +96,59 @@ export function AdminPanel() {
 				</View>
 			</View>
 
-			<View style={styles.section}>
-				<Text style={styles.label}>Number of Carries</Text>
-				<View style={styles.buttonRow}>
-					{numCarriesOptions.map((n) => (
-						<Pressable
-							key={n}
-							style={[
-								styles.optionButton,
-								difficulty.numCarries === n && styles.optionButtonActive,
-							]}
-							onPress={() => handleNumCarries(n)}
-						>
-							<Text
+			{operation === "addition" ? (
+				<View style={styles.section}>
+					<Text style={styles.label}>Number of Carries</Text>
+					<View style={styles.buttonRow}>
+						{numCarriesOptions.map((n) => (
+							<Pressable
+								key={n}
 								style={[
-									styles.optionText,
-									difficulty.numCarries === n && styles.optionTextActive,
+									styles.optionButton,
+									difficulty.numCarries === n && styles.optionButtonActive,
 								]}
+								onPress={() => handleNumCarries(n)}
 							>
-								{n}
-							</Text>
-						</Pressable>
-					))}
+								<Text
+									style={[
+										styles.optionText,
+										difficulty.numCarries === n && styles.optionTextActive,
+									]}
+								>
+									{n}
+								</Text>
+							</Pressable>
+						))}
+					</View>
 				</View>
-			</View>
+			) : (
+				<View style={styles.section}>
+					<Text style={styles.label}>Number of Borrows</Text>
+					<View style={styles.buttonRow}>
+						{numBorrowsOptions.map((n) => (
+							<Pressable
+								key={n}
+								style={[
+									styles.optionButton,
+									subtractionDifficulty.numBorrows === n &&
+										styles.optionButtonActive,
+								]}
+								onPress={() => handleNumBorrows(n)}
+							>
+								<Text
+									style={[
+										styles.optionText,
+										subtractionDifficulty.numBorrows === n &&
+											styles.optionTextActive,
+									]}
+								>
+									{n}
+								</Text>
+							</Pressable>
+						))}
+					</View>
+				</View>
+			)}
 
 			<View style={styles.section}>
 				<Text style={styles.label}>Mode</Text>

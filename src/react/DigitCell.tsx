@@ -10,6 +10,7 @@ type DigitCellProps =
 			value: string;
 			status: CellStatus;
 			locked?: boolean;
+			maxLength?: number;
 			onChangeText: (t: string) => void;
 			testID?: string;
 	  }
@@ -30,7 +31,14 @@ export function DigitCell(props: DigitCellProps) {
 	}
 
 	// mode === "input"
-	const { value, status, locked = false, onChangeText, testID } = props;
+	const {
+		value,
+		status,
+		locked = false,
+		maxLength: maxLen = 1,
+		onChangeText,
+		testID,
+	} = props;
 	const editable = !locked && status !== "correct";
 
 	const cellStyle = [
@@ -50,17 +58,19 @@ export function DigitCell(props: DigitCellProps) {
 			<TextInput
 				value={value}
 				onChangeText={(t) => {
-					const last = t.slice(-1);
-					if (/^\d$/.test(last) || last === "") {
-						onChangeText(last);
+					if (t === "") {
+						onChangeText("");
+						return;
 					}
+					const digits = t.replace(/\D/g, "").slice(-maxLen);
+					if (digits.length > 0) onChangeText(digits);
 				}}
 				editable={editable}
-				maxLength={1}
+				maxLength={maxLen}
 				selectTextOnFocus
 				keyboardType="numeric"
 				style={[
-					styles.input,
+					value.length > 1 ? styles.inputSmall : styles.input,
 					locked
 						? styles.lockedText
 						: status === "correct"
@@ -110,6 +120,14 @@ const styles = StyleSheet.create({
 	},
 	input: {
 		fontSize: typography.fontSize["2xl"],
+		fontWeight: typography.fontWeight.semibold,
+		fontVariant: ["tabular-nums"],
+		textAlign: "center",
+		width: "100%",
+		height: "100%",
+	},
+	inputSmall: {
+		fontSize: typography.fontSize.lg,
 		fontWeight: typography.fontWeight.semibold,
 		fontVariant: ["tabular-nums"],
 		textAlign: "center",

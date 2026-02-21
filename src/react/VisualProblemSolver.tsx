@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
 import { PLACES, type Place } from "@domain/addition";
 import { canCarry as domainCanCarry } from "@domain/visual-addition";
 import type { VisualZone } from "@domain/visual-addition";
 import { PlaceDiscs } from "@react/PlaceDiscs";
 import { useAdditionStore } from "@react/store";
 import { colors, spacing, typography } from "@react/theme";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 const PLACE_COLORS: Record<Place | "overflow", string> = {
@@ -127,7 +127,14 @@ export function VisualProblemSolver() {
 					data-testid="visual-column-overflow"
 					testID="visual-column-overflow"
 					// @ts-ignore — web pointer event
-					onPointerUp={dropTarget ? (e: React.PointerEvent) => { e.stopPropagation(); handleDrop("overflow"); } : undefined}
+					onPointerUp={
+						dropTarget
+							? (e: React.PointerEvent) => {
+									e.stopPropagation();
+									handleDrop("overflow");
+								}
+							: undefined
+					}
 				>
 					<Text style={styles.columnLabel}>{label}</Text>
 					<View style={styles.overflowDisk}>
@@ -173,7 +180,14 @@ export function VisualProblemSolver() {
 				data-testid={`visual-column-${place}`}
 				testID={`visual-column-${place}`}
 				// @ts-ignore — web pointer event
-				onPointerUp={dropTarget ? (e: React.PointerEvent) => { e.stopPropagation(); handleDrop(place); } : undefined}
+				onPointerUp={
+					dropTarget
+						? (e: React.PointerEvent) => {
+								e.stopPropagation();
+								handleDrop(place);
+							}
+						: undefined
+				}
 			>
 				<Text style={[styles.columnLabel, isDone && styles.labelDone]}>
 					{label}
@@ -185,7 +199,9 @@ export function VisualProblemSolver() {
 					solved={colSolved}
 					locked={locked}
 					canCarry={!locked && topCanCarry}
-					isDragSource={draggingFrom?.place === place && draggingFrom?.zone === "top"}
+					isDragSource={
+						draggingFrom?.place === place && draggingFrom?.zone === "top"
+					}
 					onDiskPointerDown={() => handleDiskPointerDown("top")}
 					onCarryDragStart={() => setDraggingFrom({ place, zone: "top" })}
 					onCarryDragEnd={() => setDraggingFrom(null)}
@@ -200,7 +216,9 @@ export function VisualProblemSolver() {
 					solved={colSolved}
 					locked={locked}
 					canCarry={!locked && bottomCanCarry}
-					isDragSource={draggingFrom?.place === place && draggingFrom?.zone === "bottom"}
+					isDragSource={
+						draggingFrom?.place === place && draggingFrom?.zone === "bottom"
+					}
 					onDiskPointerDown={() => handleDiskPointerDown("bottom")}
 					onCarryDragStart={() => setDraggingFrom({ place, zone: "bottom" })}
 					onCarryDragEnd={() => setDraggingFrom(null)}

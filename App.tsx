@@ -2,6 +2,7 @@ import { AdditionProblemSolver } from "@react/AdditionProblemSolver";
 import { AdminPanel } from "@react/AdminPanel";
 import { CollapsibleSection } from "@react/CollapsibleSection";
 import { StatsPanel } from "@react/StatsPanel";
+import { SubtractionProblemSolver } from "@react/SubtractionProblemSolver";
 import { VisualProblemSolver } from "@react/VisualProblemSolver";
 import { useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
@@ -14,6 +15,8 @@ export default function App() {
 	const [screen, setScreen] = useState<Screen>("quiz");
 	const newProblem = useAdditionStore((s) => s.newProblem);
 	const mode = useAdditionStore((s) => s.mode);
+	const operation = useAdditionStore((s) => s.operation);
+	const setOperation = useAdditionStore((s) => s.setOperation);
 
 	return (
 		<View style={styles.container}>
@@ -34,8 +37,35 @@ export default function App() {
 
 			{screen === "quiz" ? (
 				<>
+					<View style={styles.operationToggle}>
+						{(["addition", "subtraction"] as const).map((op) => (
+							<Pressable
+								key={op}
+								style={[
+									styles.operationButton,
+									operation === op && styles.operationButtonActive,
+								]}
+								onPress={() => setOperation(op)}
+								// @ts-ignore — web-only
+								data-testid={`operation-btn-${op}`}
+								testID={`operation-btn-${op}`}
+							>
+								<Text
+									style={[
+										styles.operationText,
+										operation === op && styles.operationTextActive,
+									]}
+								>
+									{op === "addition" ? "Addition" : "Subtraction"}
+								</Text>
+							</Pressable>
+						))}
+					</View>
+
 					<View style={styles.problemCard}>
-						{mode === "visual" ? (
+						{operation === "subtraction" ? (
+							<SubtractionProblemSolver />
+						) : mode === "visual" ? (
 							<VisualProblemSolver />
 						) : (
 							<AdditionProblemSolver />
@@ -93,6 +123,30 @@ const styles = StyleSheet.create({
 	iconButtonText: {
 		fontSize: typography.fontSize.xl,
 		color: colors.textMuted,
+	},
+	operationToggle: {
+		flexDirection: "row",
+		gap: spacing.sm,
+	},
+	operationButton: {
+		paddingVertical: spacing.sm,
+		paddingHorizontal: spacing.md,
+		borderRadius: radius.md,
+		borderWidth: 1,
+		borderColor: colors.border,
+		backgroundColor: colors.background,
+	},
+	operationButtonActive: {
+		backgroundColor: colors.primary,
+		borderColor: colors.primary,
+	},
+	operationText: {
+		fontSize: typography.fontSize.base,
+		fontWeight: typography.fontWeight.semibold,
+		color: colors.text,
+	},
+	operationTextActive: {
+		color: colors.background,
 	},
 	problemCard: {
 		backgroundColor: colors.surface,
