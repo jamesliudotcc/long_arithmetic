@@ -104,6 +104,21 @@ export function VisualProblemSolver() {
 		setDraggingFrom(null);
 	}
 
+	function handleDropByClientCoords(clientX: number, clientY: number) {
+		if (!draggingFrom || typeof document === "undefined") return;
+		let el: Element | null = document.elementFromPoint(clientX, clientY);
+		while (el) {
+			const testId = el.getAttribute("data-testid");
+			if (testId?.startsWith("visual-column-")) {
+				const key = testId.replace("visual-column-", "") as Place | "overflow";
+				handleDrop(key);
+				return;
+			}
+			el = el.parentElement;
+		}
+		setDraggingFrom(null);
+	}
+
 	function isDropTarget(placeKey: Place | "overflow"): boolean {
 		if (!draggingFrom) return false;
 		const sourceIdx = PLACES.indexOf(draggingFrom.place);
@@ -126,15 +141,6 @@ export function VisualProblemSolver() {
 					// @ts-ignore — web-only
 					data-testid="visual-column-overflow"
 					testID="visual-column-overflow"
-					// @ts-ignore — web pointer event
-					onPointerUp={
-						dropTarget
-							? (e: React.PointerEvent) => {
-									e.stopPropagation();
-									handleDrop("overflow");
-								}
-							: undefined
-					}
 				>
 					<Text style={styles.columnLabel}>{label}</Text>
 					<View style={styles.overflowDisk}>
@@ -179,15 +185,6 @@ export function VisualProblemSolver() {
 				// @ts-ignore — web-only
 				data-testid={`visual-column-${place}`}
 				testID={`visual-column-${place}`}
-				// @ts-ignore — web pointer event
-				onPointerUp={
-					dropTarget
-						? (e: React.PointerEvent) => {
-								e.stopPropagation();
-								handleDrop(place);
-							}
-						: undefined
-				}
 			>
 				<Text style={[styles.columnLabel, isDone && styles.labelDone]}>
 					{label}
@@ -202,9 +199,7 @@ export function VisualProblemSolver() {
 					isDragSource={
 						draggingFrom?.place === place && draggingFrom?.zone === "top"
 					}
-					onDiskPointerDown={() => handleDiskPointerDown("top")}
 					onCarryDragStart={() => setDraggingFrom({ place, zone: "top" })}
-					onCarryDragEnd={() => setDraggingFrom(null)}
 					testID={`visual-zone-top-${place}`}
 					diskTestIDPrefix={`visual-disk-top-${place}`}
 				/>
@@ -221,7 +216,6 @@ export function VisualProblemSolver() {
 					}
 					onDiskPointerDown={() => handleDiskPointerDown("bottom")}
 					onCarryDragStart={() => setDraggingFrom({ place, zone: "bottom" })}
-					onCarryDragEnd={() => setDraggingFrom(null)}
 					testID={`visual-zone-bottom-${place}`}
 					diskTestIDPrefix={`visual-disk-bottom-${place}`}
 				/>
@@ -236,7 +230,9 @@ export function VisualProblemSolver() {
 			data-testid="visual-problem-solver"
 			testID="visual-problem-solver"
 			// @ts-ignore — web pointer event
-			onPointerUp={() => setDraggingFrom(null)}
+			onPointerUp={(e: React.PointerEvent) =>
+				handleDropByClientCoords(e.clientX, e.clientY)
+			}
 		>
 			<View style={styles.columnsRow}>
 				{showOverflow && renderColumn("overflow")}

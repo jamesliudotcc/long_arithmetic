@@ -52,6 +52,29 @@ async function dragDisk(
 	await page.mouse.up();
 }
 
+/** Drag a top zone onto the next column to carry a set of 10.
+ *  Moves mouse to (0,0) first to ensure a clean entry into the source zone. */
+async function carryZone(page: Page, place: string, targetPlace: string) {
+	const source = page.getByTestId(`visual-zone-top-${place}`);
+	const target = page.getByTestId(`visual-column-${targetPlace}`);
+	const sourceBox = await source.boundingBox();
+	const targetBox = await target.boundingBox();
+	if (!sourceBox || !targetBox)
+		throw new Error("Could not get bounding box for carry");
+	await page.mouse.move(0, 0);
+	await page.mouse.move(
+		sourceBox.x + sourceBox.width / 2,
+		sourceBox.y + sourceBox.height / 2,
+	);
+	await page.mouse.down();
+	await page.mouse.move(
+		targetBox.x + targetBox.width / 2,
+		targetBox.y + targetBox.height / 2,
+		{ steps: 8 },
+	);
+	await page.mouse.up();
+}
+
 /** Consolidate all disks into top zone, then carry out any 10-sets.
  *  Repeats until top < 10 (column ready to advance). */
 async function solveColumn(page: Page, place: string) {
@@ -72,9 +95,7 @@ async function solveColumn(page: Page, place: string) {
 	let top = await diskCount(page, "top", place);
 	while (top >= 10) {
 		const target = CARRY_TARGET[place];
-		await page
-			.getByTestId(`visual-zone-top-${place}`)
-			.dragTo(page.getByTestId(`visual-column-${target}`));
+		await carryZone(page, place, target);
 		await expect.poll(() => diskCount(page, "top", place)).toBe(top - 10);
 		top -= 10;
 	}
@@ -109,24 +130,20 @@ test.describe("Visual mode", () => {
 		}
 	});
 
-	test("dragging a disk between zones updates counts by ±1", async ({
+	test("dragging a disk from bottom to top updates counts by ±1", async ({
 		page,
 	}) => {
 		await switchToVisualMode(page);
-		// Find a zone with at least one disk
-		const topCount = await diskCount(page, "top", "ones_pl");
-		const fromZone = topCount > 0 ? "top" : "bottom";
-		const toZone = fromZone === "top" ? "bottom" : "top";
-		const before = await diskCount(page, fromZone, "ones_pl");
-		if (before === 0) return; // both addends are 0 for ones column — skip
-		const otherBefore = await diskCount(page, toZone, "ones_pl");
-		await dragDisk(page, "ones_pl", fromZone, toZone);
+		const bottomBefore = await diskCount(page, "bottom", "ones_pl");
+		if (bottomBefore === 0) return; // addend2 is 0 for ones column — skip
+		const topBefore = await diskCount(page, "top", "ones_pl");
+		await dragDisk(page, "ones_pl", "bottom", "top");
 		await expect
-			.poll(() => diskCount(page, fromZone, "ones_pl"))
-			.toBe(before - 1);
+			.poll(() => diskCount(page, "bottom", "ones_pl"))
+			.toBe(bottomBefore - 1);
 		await expect
-			.poll(() => diskCount(page, toZone, "ones_pl"))
-			.toBe(otherBefore + 1);
+			.poll(() => diskCount(page, "top", "ones_pl"))
+			.toBe(topBefore + 1);
 	});
 
 	test("dragging a zone with 10 disks onto the next column carries 10", async ({
@@ -137,6 +154,9 @@ test.describe("Visual mode", () => {
 		let bottom = await diskCount(page, "bottom", "ones_pl");
 		while (bottom > 0) {
 			await dragDisk(page, "ones_pl", "bottom", "top");
+			await expect
+				.poll(() => diskCount(page, "bottom", "ones_pl"))
+				.toBe(bottom - 1);
 			bottom--;
 		}
 		const top = await diskCount(page, "top", "ones_pl");
@@ -145,9 +165,7 @@ test.describe("Visual mode", () => {
 			return;
 		}
 		const tensBefore = await diskCount(page, "top", "tens_pl");
-		await page
-			.getByTestId("visual-zone-top-ones_pl")
-			.dragTo(page.getByTestId("visual-column-tens_pl"));
+		await carryZone(page, "ones_pl", "tens_pl");
 		// Ones top loses 10; tens top gains 1
 		await expect.poll(() => diskCount(page, "top", "ones_pl")).toBe(top - 10);
 		await expect
@@ -171,12 +189,12 @@ test.describe("Visual mode", () => {
 
 	test("New Problem resets the visual work state", async ({ page }) => {
 		await switchToVisualMode(page);
-		const topBefore = await diskCount(page, "top", "ones_pl");
-		if (topBefore > 0) {
-			await dragDisk(page, "ones_pl", "top", "bottom");
+		const bottomBefore = await diskCount(page, "bottom", "ones_pl");
+		if (bottomBefore > 0) {
+			await dragDisk(page, "ones_pl", "bottom", "top");
 			await expect
-				.poll(() => diskCount(page, "top", "ones_pl"))
-				.toBe(topBefore - 1);
+				.poll(() => diskCount(page, "bottom", "ones_pl"))
+				.toBe(bottomBefore - 1);
 		}
 		await page.getByText("New Problem").click();
 		// After reset: solver still visible with a fresh problem

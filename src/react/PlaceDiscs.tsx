@@ -23,7 +23,6 @@ type PlaceDiscsProps = {
 	onDiskPointerDown?: (e: React.PointerEvent, diskIndex: number) => void;
 	isDragSource?: boolean;
 	onCarryDragStart?: () => void;
-	onCarryDragEnd?: () => void;
 	testID?: string;
 	diskTestIDPrefix?: string;
 };
@@ -38,7 +37,6 @@ export function PlaceDiscs({
 	isDragSource,
 	onDiskPointerDown,
 	onCarryDragStart,
-	onCarryDragEnd,
 	testID,
 	diskTestIDPrefix,
 }: PlaceDiscsProps) {
@@ -46,8 +44,6 @@ export function PlaceDiscs({
 
 	function handleGridPointerDown(e: React.PointerEvent) {
 		if (!canCarry) return;
-		// Release capture so pointerup fires on whatever element the pointer lands on
-		(e.currentTarget as unknown as Element).releasePointerCapture(e.pointerId);
 		onCarryDragStart?.();
 	}
 
@@ -64,8 +60,6 @@ export function PlaceDiscs({
 				testID={testID}
 				// @ts-ignore — web pointer event
 				onPointerDown={canCarry ? handleGridPointerDown : undefined}
-				// @ts-ignore — web pointer event
-				onPointerUp={canCarry ? onCarryDragEnd : undefined}
 			>
 				{Array.from({ length: count }, (_, i) => {
 					const diskTestID = diskTestIDPrefix

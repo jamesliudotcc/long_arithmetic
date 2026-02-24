@@ -16,7 +16,7 @@ export type VisualWorkState = {
 
 export function isColumnDone(col: VisualColumnState): boolean {
 	const total = col.top + col.bottom;
-	return total < 10 && (col.top === 0 || col.bottom === 0);
+	return total < 10 && col.bottom === 0;
 }
 
 export function canCarry(col: VisualColumnState, zone: VisualZone): boolean {
@@ -69,12 +69,13 @@ export function applyMoveDisk(
 	from: VisualZone,
 	numPlaces: number,
 ): VisualWorkState {
+	if (from !== "bottom") return work;
 	const index = PLACES.indexOf(place);
 	if (index !== work.activeColumn) return work;
 	const col = work.columns[place];
 	if (col[from] <= 0) return work;
 
-	const other: VisualZone = from === "top" ? "bottom" : "top";
+	const other: VisualZone = "top";
 	const newCol: VisualColumnState = {
 		...col,
 		[from]: col[from] - 1,

@@ -13,8 +13,12 @@ describe("isColumnDone", () => {
 		expect(isColumnDone({ top: 0, bottom: 0 })).toBe(true);
 	});
 
-	it("{top:5, bottom:0} → true (one zone, count < 10)", () => {
+	it("{top:5, bottom:0} → true (all in top)", () => {
 		expect(isColumnDone({ top: 5, bottom: 0 })).toBe(true);
+	});
+
+	it("{top:0, bottom:5} → false (discs still in bottom)", () => {
+		expect(isColumnDone({ top: 0, bottom: 5 })).toBe(false);
 	});
 
 	it("{top:3, bottom:4} → false (split across zones)", () => {
@@ -87,12 +91,11 @@ describe("applyMoveDisk", () => {
 		numPlaces: 2,
 	};
 
-	it("moves 1 disk from top to bottom", () => {
+	it("pushing down (from top) is a no-op", () => {
 		const work = initialVisualWork(baseProblem);
 		// ones_pl: top=3, bottom=5, activeColumn=0
 		const next = applyMoveDisk(work, "ones_pl", "top", 2);
-		expect(next.columns.ones_pl.top).toBe(2);
-		expect(next.columns.ones_pl.bottom).toBe(6);
+		expect(next).toBe(work);
 	});
 
 	it("moves 1 disk from bottom to top", () => {

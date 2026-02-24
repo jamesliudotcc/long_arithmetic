@@ -211,7 +211,6 @@ export function VisualProblemSolver() {
 							isDragSource={
 								draggingFrom?.place === place && draggingFrom?.zone === "top"
 							}
-							onDiskPointerDown={() => handleDiskPress("top")}
 							testID={`visual-zone-top-${place}`}
 							diskTestIDPrefix={`visual-disk-top-${place}`}
 						/>
