@@ -3,14 +3,29 @@
 		"name": "Long Arithmetic",
 		"slug": "long-arithmetic",
 		"version": "1.0.0",
+		"scheme": "longarithmetic",
 		"orientation": "portrait",
-		"platforms": ["web"],
+		"platforms": ["web", "ios", "android"],
 		"web": {
 			"bundler": "metro",
 			"output": "single"
 		},
+		"ios": {
+			"supportsTablet": true,
+			"bundleIdentifier": "com.jamesliudotcc.longarithmetic"
+		},
+		"android": {
+			"package": "com.jamesliudotcc.longarithmetic"
+		},
 		"experiments": {
 			"baseUrl": "/long_arithmetic/"
-		}
+		},
+		"extra": {
+			"eas": {
+				"projectId": "6191c702-455b-4d90-a7f9-6fc0d2ada2d3"
+			}
+		},
+		"owner": "jamesliudotai",
+		"plugins": ["expo-router"]
 	}
 }

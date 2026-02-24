@@ -1,4 +1,4 @@
-.PHONY: help install clean chingon lint format typecheck build.web build.web.dist serve.web run test.unit test.e2e test.e2e.ui test
+.PHONY: help install clean chingon lint format typecheck build.web build.web.dist build.ios build.android build.native serve.web run test.unit test.e2e test.e2e.ui test
 
 help: ## Show this help
 	@grep -hE '^[a-z0-9._]+:.*##' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-20s %s\n", $$1, $$2}'
@@ -46,3 +46,12 @@ build.web: ## Export web build (outputs to dist/)
 
 build.web.dist: ## Export web build explicitly to dist/
 	bunx expo export --platform web --output-dir dist
+
+build.ios: ## EAS build for iOS (preview)
+	bunx eas build --platform ios --profile preview
+
+build.android: ## EAS build for Android (preview)
+	bunx eas build --platform android --profile preview
+
+build.native: ## EAS build for both platforms (preview)
+	bunx eas build --platform all --profile preview

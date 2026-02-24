@@ -8,5 +8,6 @@
 			"@react/*": ["./src/react/*"],
 			"@web/*": ["./src/web/*"]
 		}
-	}
+	},
+	"exclude": ["node_modules", "dist"]
 }
