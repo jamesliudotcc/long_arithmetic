@@ -242,6 +242,50 @@ describe("applyCarryOut", () => {
 		expect(next.activeColumn).toBe(1);
 	});
 
+	it("auto-drains remaining bottom discs to top after a top-zone carry", () => {
+		// ones: top=10, bottom=3 — user moved just enough to carry from top
+		const work = initialVisualWork({
+			addend1: { ones_pl: 7, tens_pl: 1, hundreds_pl: 0, thousands_pl: 0 },
+			addend2: { ones_pl: 6, tens_pl: 1, hundreds_pl: 0, thousands_pl: 0 },
+			numPlaces: 2,
+		});
+		// Move 3 bottom discs to top: top=10, bottom=3
+		let w = work;
+		for (let i = 0; i < 3; i++) {
+			w = applyMoveDisk(w, "ones_pl", "bottom", 2);
+		}
+		expect(w.columns.ones_pl).toEqual({ top: 10, bottom: 3 });
+
+		const next = applyCarryOut(w, "ones_pl", "top", 2);
+		// After carry: top=0, bottom=3 → auto-drain → top=3, bottom=0
+		expect(next.columns.ones_pl).toEqual({ top: 3, bottom: 0 });
+		expect(next.activeColumn).toBe(1); // column done, advance
+	});
+
+	it("auto-drains remaining bottom discs after a bottom-zone carry", () => {
+		// ones: top=3, bottom=12 — bottom zone can carry directly
+		const work = initialVisualWork({
+			addend1: { ones_pl: 3, tens_pl: 1, hundreds_pl: 0, thousands_pl: 0 },
+			addend2: { ones_pl: 9, tens_pl: 1, hundreds_pl: 0, thousands_pl: 0 },
+			numPlaces: 2,
+		});
+		// addend2=9 so bottom=9, need to augment: use a custom state
+		// Actually use ones: top=3, bottom=12 by construction via a 1-digit base
+		const w2 = initialVisualWork({
+			addend1: { ones_pl: 3, tens_pl: 1, hundreds_pl: 0, thousands_pl: 0 },
+			addend2: { ones_pl: 12, tens_pl: 1, hundreds_pl: 0, thousands_pl: 0 },
+			numPlaces: 2,
+		});
+		// ones: top=3, bottom=12 → bottom can carry
+		expect(w2.columns.ones_pl).toEqual({ top: 3, bottom: 12 });
+
+		const next = applyCarryOut(w2, "ones_pl", "bottom", 2);
+		// After carry: bottom=2, top=3 → auto-drain → top=5, bottom=0
+		expect(next.columns.ones_pl).toEqual({ top: 5, bottom: 0 });
+		expect(next.columns.tens_pl.top).toBe(2); // 1 + carry 1
+		expect(next.activeColumn).toBe(1);
+	});
+
 	it("full 2-column scenario: 7+5 ones → carry → tens gets +1", () => {
 		// ones: top=7, bottom=5
 		const work = initialVisualWork({

@@ -120,6 +120,16 @@ export function applyCarryOut(
 		};
 	}
 
+	// Auto-drain: move all remaining bottom discs to top so the user doesn't
+	// have to click each one individually after a carry.
+	const afterCarry = newColumns[place];
+	if (afterCarry.bottom > 0) {
+		newColumns = {
+			...newColumns,
+			[place]: { top: afterCarry.top + afterCarry.bottom, bottom: 0 },
+		};
+	}
+
 	const newWork: VisualWorkState = {
 		...work,
 		columns: newColumns,
