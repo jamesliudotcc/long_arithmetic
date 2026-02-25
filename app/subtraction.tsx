@@ -66,12 +66,16 @@ export default function SubtractionScreen() {
 		}, [setOperation]),
 	);
 
-	// Mirror store changes → URL params
+	// Mirror store changes → URL params (guarded: navigator may not be ready on first effect)
 	useEffect(() => {
-		router.setParams({
-			numDigits: String(subtractionDifficulty.numPlaces),
-			numBorrows: String(subtractionDifficulty.numBorrows),
-		});
+		try {
+			router.setParams({
+				numDigits: String(subtractionDifficulty.numPlaces),
+				numBorrows: String(subtractionDifficulty.numBorrows),
+			});
+		} catch {
+			// navigator not ready yet on initial mount; params are already in the URL
+		}
 	}, [subtractionDifficulty]);
 
 	function handleSwitchToAddition() {
