@@ -112,6 +112,10 @@ export function SubtractionProblemSolver() {
 						key={place}
 						mode="static"
 						value={String(minuend[place])}
+						strikethrough={
+							work.entries[place].borrow !== "" ||
+							work.entries[place].effectiveValue !== ""
+						}
 						testID={`minuend-${place}`}
 					/>
 				))}

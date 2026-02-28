@@ -14,7 +14,7 @@ type DigitCellProps =
 			onChangeText: (t: string) => void;
 			testID?: string;
 	  }
-	| { mode: "static"; value: string; testID?: string }
+	| { mode: "static"; value: string; strikethrough?: boolean; testID?: string }
 	| { mode: "empty"; testID?: string };
 
 export function DigitCell(props: DigitCellProps) {
@@ -25,7 +25,11 @@ export function DigitCell(props: DigitCellProps) {
 	if (props.mode === "static") {
 		return (
 			<View style={styles.cell} testID={props.testID}>
-				<Text style={styles.digit}>{props.value}</Text>
+				<Text
+					style={[styles.digit, props.strikethrough && styles.strikethrough]}
+				>
+					{props.value}
+				</Text>
 			</View>
 		);
 	}
@@ -96,6 +100,9 @@ const styles = StyleSheet.create({
 		fontWeight: typography.fontWeight.semibold,
 		color: colors.text,
 		fontVariant: ["tabular-nums"],
+	},
+	strikethrough: {
+		textDecorationLine: "line-through",
 	},
 	inputCell: {
 		borderWidth: 1,
