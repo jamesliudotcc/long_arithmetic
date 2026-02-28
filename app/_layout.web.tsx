@@ -1,4 +1,5 @@
 import "@picocss/pico/css/pico.min.css";
+import "@react/overrides.css";
 import { LocalStorageAdapter } from "@infrastructure/local-storage-adapter";
 import { initializeStorage } from "@react/store";
 import { Stack } from "expo-router";

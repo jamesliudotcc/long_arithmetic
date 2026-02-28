@@ -1,0 +1,12 @@
+[data-testid="addition-problem-solver"] input,
+[data-testid="subtraction-problem-solver"] input {
+	padding: 0;
+	border: none;
+	height: auto;
+	min-height: 0;
+	background: transparent;
+	box-shadow: none;
+	outline: none;
+	margin: 0;
+	appearance: auto;
+}
