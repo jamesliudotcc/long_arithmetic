@@ -2,6 +2,7 @@ import { AdminPanel } from "@react/AdminPanel";
 import { CollapsibleSection } from "@react/CollapsibleSection";
 import { StatsPanel } from "@react/StatsPanel";
 import { SubtractionProblemSolver } from "@react/SubtractionProblemSolver";
+import { VisualSubtractionSolver } from "@react/VisualSubtractionSolver";
 import { useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -16,6 +17,7 @@ export default function SubtractionScreen() {
 	const subtractionDifficulty = useAdditionStore(
 		(s) => s.subtractionDifficulty,
 	);
+	const mode = useAdditionStore((s) => s.mode);
 	const newProblem = useAdditionStore((s) => s.newProblem);
 	const setOperation = useAdditionStore((s) => s.setOperation);
 	const setSubtractionDifficulty = useAdditionStore(
@@ -119,7 +121,11 @@ export default function SubtractionScreen() {
 				</View>
 
 				<View style={styles.problemCard}>
-					<SubtractionProblemSolver />
+					{mode === "visual" ? (
+						<VisualSubtractionSolver />
+					) : (
+						<SubtractionProblemSolver />
+					)}
 				</View>
 
 				<Pressable

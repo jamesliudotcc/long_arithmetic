@@ -23,6 +23,13 @@ import {
 	applyMoveDisk,
 	initialVisualWork,
 } from "@domain/visual-addition";
+import {
+	type VisualSubWorkState,
+	applySubBorrowFrom,
+	applySubCancel,
+	applySubMoveBorrowDown,
+	initialVisualSubWork,
+} from "@domain/visual-subtraction";
 import { InMemoryStorage } from "@infrastructure/in-memory-storage";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
@@ -75,6 +82,7 @@ type State = {
 	subtractionProblem: SubtractionProblem;
 	subtractionSolution: SubtractionSolution;
 	subtractionWork: SubtractionWorkState;
+	visualSubWork: VisualSubWorkState;
 };
 
 type Actions = {
@@ -92,6 +100,9 @@ type Actions = {
 	enterSubtractionAnswer: (place: Place, digit: string) => void;
 	enterSubtractionBorrow: (place: Place, digit: string) => void;
 	enterSubtractionEffectiveValue: (place: Place, digit: string) => void;
+	cancelVisualSub: (place: Place) => void;
+	moveBorrowDownVisualSub: (place: Place) => void;
+	borrowVisualSub: (fromPlace: Place) => void;
 };
 
 const DEFAULT_DIFFICULTY: AdditionDifficulty = { numPlaces: 3, numCarries: 2 };
@@ -138,6 +149,7 @@ export function initializeStorage(storage: StoragePort): void {
 		nextState.subtractionProblem = subProb;
 		nextState.subtractionSolution = computeSubtractionSolution(subProb);
 		nextState.subtractionWork = initialSubtractionWork();
+		nextState.visualSubWork = initialVisualSubWork(subProb);
 	}
 
 	useAdditionStore.setState(nextState);
@@ -274,6 +286,9 @@ const initialProblem = generateAdditionProblem(DEFAULT_DIFFICULTY);
 const initialSubtractionProblem = generateSubtractionProblem(
 	DEFAULT_SUBTRACTION_DIFFICULTY,
 );
+const initialVisualSubWorkState = initialVisualSubWork(
+	initialSubtractionProblem,
+);
 
 export const useAdditionStore = create<State & Actions>()(
 	devtools(
@@ -293,6 +308,7 @@ export const useAdditionStore = create<State & Actions>()(
 				initialSubtractionProblem,
 			),
 			subtractionWork: initialSubtractionWork(),
+			visualSubWork: initialVisualSubWorkState,
 
 			newProblem: () => {
 				const {
@@ -301,6 +317,7 @@ export const useAdditionStore = create<State & Actions>()(
 					visualWork,
 					problem,
 					subtractionWork,
+					visualSubWork,
 					subtractionProblem,
 					difficulty,
 					subtractionDifficulty,
@@ -308,7 +325,9 @@ export const useAdditionStore = create<State & Actions>()(
 				} = get();
 
 				if (operation === "subtraction") {
-					if (!subtractionWork.solved) {
+					const subActiveSolved =
+						mode === "visual" ? visualSubWork.solved : subtractionWork.solved;
+					if (!subActiveSolved) {
 						recordAttemptInternal(subtractionProblem.numPlaces, false);
 					}
 					const newProb = generateSubtractionProblem(subtractionDifficulty);
@@ -317,6 +336,7 @@ export const useAdditionStore = create<State & Actions>()(
 							subtractionProblem: newProb,
 							subtractionSolution: computeSubtractionSolution(newProb),
 							subtractionWork: initialSubtractionWork(),
+							visualSubWork: initialVisualSubWork(newProb),
 						},
 						false,
 						"newProblem",
@@ -512,6 +532,7 @@ export const useAdditionStore = create<State & Actions>()(
 					visualWork,
 					problem,
 					subtractionWork,
+					visualSubWork,
 					subtractionProblem,
 					mode,
 				} = get();
@@ -524,7 +545,9 @@ export const useAdditionStore = create<State & Actions>()(
 						recordAttemptInternal(problem.numPlaces, false);
 					}
 				} else {
-					if (!subtractionWork.solved) {
+					const subActiveSolved =
+						mode === "visual" ? visualSubWork.solved : subtractionWork.solved;
+					if (!subActiveSolved) {
 						recordAttemptInternal(subtractionProblem.numPlaces, false);
 					}
 				}
@@ -533,8 +556,11 @@ export const useAdditionStore = create<State & Actions>()(
 			},
 
 			setSubtractionDifficulty: (difficulty: SubtractionDifficulty) => {
-				const { subtractionWork, subtractionProblem } = get();
-				if (!subtractionWork.solved) {
+				const { subtractionWork, visualSubWork, subtractionProblem, mode } =
+					get();
+				const subActiveSolved =
+					mode === "visual" ? visualSubWork.solved : subtractionWork.solved;
+				if (!subActiveSolved) {
 					recordAttemptInternal(subtractionProblem.numPlaces, false);
 				}
 				const clampedBorrows = Math.min(
@@ -553,6 +579,7 @@ export const useAdditionStore = create<State & Actions>()(
 						subtractionProblem: newProb,
 						subtractionSolution: computeSubtractionSolution(newProb),
 						subtractionWork: initialSubtractionWork(),
+						visualSubWork: initialVisualSubWork(newProb),
 					},
 					false,
 					"setSubtractionDifficulty",
@@ -694,6 +721,45 @@ export const useAdditionStore = create<State & Actions>()(
 					false,
 					"enterSubtractionEffectiveValue",
 				);
+			},
+
+			cancelVisualSub: (place: Place) => {
+				const { visualSubWork, subtractionProblem } = get();
+				const newWork = applySubCancel(
+					visualSubWork,
+					place,
+					subtractionProblem.numPlaces,
+				);
+				if (newWork.solved && !visualSubWork.solved) {
+					recordAttemptInternal(subtractionProblem.numPlaces, true);
+				}
+				set({ visualSubWork: newWork }, false, "cancelVisualSub");
+			},
+
+			moveBorrowDownVisualSub: (place: Place) => {
+				const { visualSubWork, subtractionProblem } = get();
+				const newWork = applySubMoveBorrowDown(
+					visualSubWork,
+					place,
+					subtractionProblem.numPlaces,
+				);
+				if (newWork.solved && !visualSubWork.solved) {
+					recordAttemptInternal(subtractionProblem.numPlaces, true);
+				}
+				set({ visualSubWork: newWork }, false, "moveBorrowDownVisualSub");
+			},
+
+			borrowVisualSub: (fromPlace: Place) => {
+				const { visualSubWork, subtractionProblem } = get();
+				const newWork = applySubBorrowFrom(
+					visualSubWork,
+					fromPlace,
+					subtractionProblem.numPlaces,
+				);
+				if (newWork.solved && !visualSubWork.solved) {
+					recordAttemptInternal(subtractionProblem.numPlaces, true);
+				}
+				set({ visualSubWork: newWork }, false, "borrowVisualSub");
 			},
 		}),
 		{ name: "LongArithmetic" },
