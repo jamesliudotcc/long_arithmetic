@@ -3,9 +3,16 @@ import { canCarry as domainCanCarry } from "@domain/visual-addition";
 import type { VisualZone } from "@domain/visual-addition";
 import { PlaceDiscs } from "@react/PlaceDiscs";
 import { useAdditionStore } from "@react/store";
-import { colors, spacing, typography } from "@react/theme";
+import { colors, radius, spacing, typography } from "@react/theme";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+
+// Mirror PlaceDiscs constants to size the overflow box to match column height
+const DISC_SIZE = 36;
+const DISC_GAP = spacing.sm;
+const MAX_BORDER = 2;
+const ZONE_HEIGHT = 2 * DISC_SIZE + DISC_GAP + 2 * DISC_GAP + 2 * MAX_BORDER; // 100
+const OVERFLOW_BOX_SIZE = ZONE_HEIGHT;
 
 const PLACE_COLORS: Record<Place | "overflow", string> = {
 	ones_pl: colors.primary,
@@ -91,7 +98,7 @@ export function VisualProblemSolver() {
 
 	// Active places most-significant first for display
 	const activePlaces = PLACES.slice(0, numPlaces).reverse() as Place[];
-	const showOverflow = solution.finalCarryOut > 0 || overflow > 0;
+	const showOverflow = true;
 
 	function handleDrop(targetPlace: Place | "overflow") {
 		if (!draggingFrom) return;
@@ -137,19 +144,25 @@ export function VisualProblemSolver() {
 			return (
 				<View
 					key="overflow"
-					style={[styles.column, dropTarget && styles.columnDropTarget]}
+					style={styles.column}
 					// @ts-ignore — web-only
 					data-testid="visual-column-overflow"
 					testID="visual-column-overflow"
 				>
 					<Text style={styles.columnLabel}>{label}</Text>
-					<View style={styles.overflowDisk}>
-						<View
-							style={[
-								styles.overflowCircle,
-								{ backgroundColor: overflow > 0 ? color : "transparent" },
-							]}
-						/>
+					<View
+						style={[
+							styles.overflowBox,
+							dropTarget && styles.overflowBoxDropTarget,
+						]}
+					>
+						{overflow > 0 && (
+							<View style={[styles.overflowDisc, { backgroundColor: color }]}>
+								<Text style={styles.overflowDiscLabel}>
+									{PLACE_DENOMINATIONS.overflow}
+								</Text>
+							</View>
+						)}
 					</View>
 				</View>
 			);
@@ -287,18 +300,30 @@ const styles = StyleSheet.create({
 	zoneSep: {
 		height: spacing.md,
 	},
-	overflowDisk: {
-		width: 44,
-		height: 44,
+	overflowBox: {
+		width: OVERFLOW_BOX_SIZE,
+		height: OVERFLOW_BOX_SIZE,
+		borderWidth: 1,
+		borderColor: colors.border,
+		borderRadius: radius.sm,
 		alignItems: "center",
 		justifyContent: "center",
 	},
-	overflowCircle: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		borderWidth: 2,
+	overflowBoxDropTarget: {
 		borderColor: PLACE_COLORS.overflow,
+		borderWidth: 2,
+	},
+	overflowDisc: {
+		width: DISC_SIZE,
+		height: DISC_SIZE,
+		borderRadius: DISC_SIZE / 2,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	overflowDiscLabel: {
+		fontSize: 12,
+		fontWeight: "700",
+		color: "#fff",
 	},
 	banner: {
 		marginTop: spacing.md,
