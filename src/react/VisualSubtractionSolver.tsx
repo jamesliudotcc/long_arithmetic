@@ -191,14 +191,17 @@ export function VisualSubtractionSolver() {
 
 				<View style={styles.zoneSep} />
 
-				{/* Subtrahend zone — display only, locked */}
+				{/* Subtrahend zone — click to cancel when active */}
 				<PlaceDiscs
 					count={col.subtrahend}
 					denomination={PLACE_DENOMINATIONS[place]}
 					color={color}
 					solved={colSolved}
-					locked={true}
+					locked={!isActive}
 					canCarry={false}
+					onDiskPointerDown={
+						isActive ? () => cancelVisualSub(place) : undefined
+					}
 					testID={`visual-sub-subtrahend-${place}`}
 					diskTestIDPrefix={`visual-sub-subtrahend-disk-${place}`}
 				/>
