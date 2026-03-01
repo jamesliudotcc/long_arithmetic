@@ -275,8 +275,8 @@ function recordAttemptInternal(
 	numPlaces: 1 | 2 | 3 | 4,
 	correct: boolean,
 ): void {
-	const mode = useAdditionStore.getState().mode;
-	const attempt = createAttempt(numPlaces, correct, mode);
+	const { mode, operation } = useAdditionStore.getState();
+	const attempt = createAttempt(numPlaces, correct, mode, operation);
 	_storage.saveAttempt(attempt);
 	useAdditionStore.setState(
 		(s) => ({ attempts: [...s.attempts, attempt] }),

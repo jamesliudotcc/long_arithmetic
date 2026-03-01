@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 type Period = "all" | "today";
 type ModeFilter = "all" | "digit" | "visual";
+type OpFilter = "all" | "addition" | "subtraction";
 
 const DIGIT_LABELS: Record<1 | 2 | 3 | 4, string> = {
 	1: "1 digit",
@@ -26,6 +27,7 @@ export function StatsPanel() {
 
 	const [period, setPeriod] = useState<Period>("all");
 	const [modeFilter, setModeFilter] = useState<ModeFilter>("all");
+	const [opFilter, setOpFilter] = useState<OpFilter>("all");
 
 	// Use the later of periodStart (manual reset) or today's midnight,
 	// so "Today" always means the current calendar day even if periodStart is stale.
@@ -36,6 +38,11 @@ export function StatsPanel() {
 			if (modeFilter === "all") return true;
 			// Old attempts without a mode field are treated as digit
 			return (a.mode ?? "digit") === modeFilter;
+		})
+		.filter((a) => {
+			if (opFilter === "all") return true;
+			// Old attempts without an operation field are treated as addition
+			return (a.operation ?? "addition") === opFilter;
 		});
 
 	return (
@@ -63,6 +70,28 @@ export function StatsPanel() {
 				<Pressable style={styles.resetButton} onPress={resetPeriod}>
 					<Text style={styles.resetText}>↺ Reset</Text>
 				</Pressable>
+			</View>
+
+			<View style={styles.toggleRow}>
+				{(["all", "addition", "subtraction"] as const).map((op) => (
+					<Pressable
+						key={op}
+						style={[
+							styles.toggleButton,
+							opFilter === op && styles.toggleButtonActive,
+						]}
+						onPress={() => setOpFilter(op)}
+					>
+						<Text
+							style={[
+								styles.toggleText,
+								opFilter === op && styles.toggleTextActive,
+							]}
+						>
+							{op === "all" ? "All Ops" : op === "addition" ? "+" : "−"}
+						</Text>
+					</Pressable>
+				))}
 			</View>
 
 			<View style={styles.toggleRow}>
@@ -95,14 +124,11 @@ export function StatsPanel() {
 
 					if (period === "all" && total === 0) return null;
 
-					const pct =
-						total === 0 ? "—" : `${Math.round((correct / total) * 100)}%`;
-
 					return (
 						<View key={n} style={styles.row}>
 							<Text style={styles.rowLabel}>{DIGIT_LABELS[n]}</Text>
 							<Text style={styles.rowStat}>
-								{total === 0 ? "—" : `${total} attempted, ${pct} correct`}
+								{total === 0 ? "—" : `${correct} completed`}
 							</Text>
 						</View>
 					);
