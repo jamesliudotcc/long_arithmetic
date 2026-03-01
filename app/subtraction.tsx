@@ -1,19 +1,16 @@
-import { AdminPanel } from "@react/AdminPanel";
-import { CollapsibleSection } from "@react/CollapsibleSection";
-import { StatsPanel } from "@react/StatsPanel";
 import { SubtractionProblemSolver } from "@react/SubtractionProblemSolver";
+import { Toolbox } from "@react/Toolbox";
 import { VisualSubtractionSolver } from "@react/VisualSubtractionSolver";
 import { useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function SubtractionScreen() {
 	const { numDigits: rawNumDigits, numBorrows: rawNumBorrows } =
 		useLocalSearchParams<{ numDigits?: string; numBorrows?: string }>();
 
-	const difficulty = useAdditionStore((s) => s.difficulty);
 	const subtractionDifficulty = useAdditionStore(
 		(s) => s.subtractionDifficulty,
 	);
@@ -23,6 +20,7 @@ export default function SubtractionScreen() {
 	const setSubtractionDifficulty = useAdditionStore(
 		(s) => s.setSubtractionDifficulty,
 	);
+	const setToolboxOpen = useAdditionStore((s) => s.setToolboxOpen);
 
 	// On initial mount, sync URL params → store (handles deep links)
 	const didSyncRef = useRef(false);
@@ -80,43 +78,17 @@ export default function SubtractionScreen() {
 		}
 	}, [subtractionDifficulty]);
 
-	function handleSwitchToAddition() {
-		router.push({
-			pathname: "/addition",
-			params: {
-				numDigits: String(difficulty.numPlaces),
-				numCarries: String(difficulty.numCarries),
-			},
-		});
-	}
-
 	return (
 		<View style={styles.page}>
 			{/* Quiz area — plain View so pointer events reach the solvers */}
 			<View style={styles.quizArea}>
 				<View style={styles.header}>
 					<Text style={styles.title}>Long Arithmetic</Text>
-				</View>
-
-				<View style={styles.operationToggle}>
 					<Pressable
-						style={styles.operationButton}
-						onPress={handleSwitchToAddition}
-						// @ts-ignore — web-only
-						data-testid="operation-btn-addition"
-						testID="operation-btn-addition"
+						style={styles.hamburger}
+						onPress={() => setToolboxOpen(true)}
 					>
-						<Text style={styles.operationText}>Addition</Text>
-					</Pressable>
-					<Pressable
-						style={[styles.operationButton, styles.operationButtonActive]}
-						// @ts-ignore — web-only
-						data-testid="operation-btn-subtraction"
-						testID="operation-btn-subtraction"
-					>
-						<Text style={[styles.operationText, styles.operationTextActive]}>
-							Subtraction
-						</Text>
+						<Text style={styles.hamburgerText}>☰</Text>
 					</Pressable>
 				</View>
 
@@ -139,20 +111,7 @@ export default function SubtractionScreen() {
 				</Pressable>
 			</View>
 
-			{/* Settings/Stats — in a ScrollView so long panels are reachable */}
-			<ScrollView
-				style={styles.settingsScroll}
-				contentContainerStyle={styles.settingsContent}
-				keyboardShouldPersistTaps="handled"
-			>
-				<CollapsibleSection title="Settings" defaultOpen={false}>
-					<AdminPanel />
-				</CollapsibleSection>
-
-				<CollapsibleSection title="Statistics">
-					<StatsPanel />
-				</CollapsibleSection>
-			</ScrollView>
+			<Toolbox />
 		</View>
 	);
 }
@@ -170,36 +129,20 @@ const styles = StyleSheet.create({
 	header: {
 		flexDirection: "row",
 		alignItems: "center",
-		gap: spacing.md,
+		justifyContent: "space-between",
+		width: "100%",
 	},
 	title: {
 		fontSize: typography.fontSize["2xl"],
 		fontWeight: typography.fontWeight.bold,
 		color: colors.text,
 	},
-	operationToggle: {
-		flexDirection: "row",
-		gap: spacing.sm,
+	hamburger: {
+		padding: spacing.sm,
 	},
-	operationButton: {
-		paddingVertical: spacing.sm,
-		paddingHorizontal: spacing.md,
-		borderRadius: radius.md,
-		borderWidth: 1,
-		borderColor: colors.border,
-		backgroundColor: colors.background,
-	},
-	operationButtonActive: {
-		backgroundColor: colors.primary,
-		borderColor: colors.primary,
-	},
-	operationText: {
-		fontSize: typography.fontSize.base,
-		fontWeight: typography.fontWeight.semibold,
+	hamburgerText: {
+		fontSize: typography.fontSize["2xl"],
 		color: colors.text,
-	},
-	operationTextActive: {
-		color: colors.background,
 	},
 	problemCard: {
 		backgroundColor: colors.surface,
@@ -221,13 +164,5 @@ const styles = StyleSheet.create({
 		color: colors.background,
 		fontSize: typography.fontSize.lg,
 		fontWeight: typography.fontWeight.semibold,
-	},
-	settingsScroll: {
-		width: "100%",
-	},
-	settingsContent: {
-		gap: spacing.md,
-		paddingHorizontal: spacing.md,
-		paddingVertical: spacing.sm,
 	},
 });

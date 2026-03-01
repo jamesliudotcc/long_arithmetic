@@ -2,6 +2,7 @@ import type { AdditionDifficulty } from "@domain/addition";
 import type { SubtractionDifficulty } from "@domain/subtraction";
 import { type Mode, useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
+import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 const NUM_PLACES_OPTIONS = [1, 2, 3, 4] as const;
@@ -59,6 +60,27 @@ export function AdminPanel() {
 		});
 	}
 
+	function handleSwitchOperation(target: "addition" | "subtraction") {
+		if (target === operation) return;
+		if (target === "subtraction") {
+			router.push({
+				pathname: "/subtraction",
+				params: {
+					numDigits: String(subtractionDifficulty.numPlaces),
+					numBorrows: String(subtractionDifficulty.numBorrows),
+				},
+			});
+		} else {
+			router.push({
+				pathname: "/addition",
+				params: {
+					numDigits: String(difficulty.numPlaces),
+					numCarries: String(difficulty.numCarries),
+				},
+			});
+		}
+	}
+
 	function handleReset() {
 		setDifficulty({ numPlaces: 3, numCarries: 2 });
 		setSubtractionDifficulty({ numPlaces: 3, numBorrows: 2 });
@@ -69,7 +91,34 @@ export function AdminPanel() {
 
 	return (
 		<View style={styles.panel}>
-			<Text style={styles.heading}>Settings</Text>
+			<View style={styles.section}>
+				<Text style={styles.label}>Operation</Text>
+				<View style={styles.buttonRow}>
+					{(["addition", "subtraction"] as const).map((op) => (
+						<Pressable
+							key={op}
+							style={[
+								styles.optionButton,
+								styles.operationOptionButton,
+								operation === op && styles.optionButtonActive,
+							]}
+							onPress={() => handleSwitchOperation(op)}
+							// @ts-ignore — web-only
+							data-testid={`operation-btn-${op}`}
+							testID={`operation-btn-${op}`}
+						>
+							<Text
+								style={[
+									styles.optionText,
+									operation === op && styles.optionTextActive,
+								]}
+							>
+								{op === "addition" ? "Addition" : "Subtraction"}
+							</Text>
+						</Pressable>
+					))}
+				</View>
+			</View>
 
 			<View style={styles.section}>
 				<Text style={styles.label}>Number of Digits</Text>
@@ -190,11 +239,6 @@ const styles = StyleSheet.create({
 	panel: {
 		gap: spacing.xl,
 	},
-	heading: {
-		fontSize: typography.fontSize["2xl"],
-		fontWeight: typography.fontWeight.bold,
-		color: colors.text,
-	},
 	section: {
 		gap: spacing.sm,
 	},
@@ -219,6 +263,9 @@ const styles = StyleSheet.create({
 	},
 	modeButton: {
 		width: 72,
+	},
+	operationOptionButton: {
+		width: 104,
 	},
 	optionButtonActive: {
 		backgroundColor: colors.primary,

@@ -5,19 +5,29 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 type Props = {
 	title: string;
 	defaultOpen?: boolean;
+	onOpenChange?: (open: boolean) => void;
 	children: React.ReactNode;
 };
 
 export function CollapsibleSection({
 	title,
 	defaultOpen = false,
+	onOpenChange,
 	children,
 }: Props) {
 	const [open, setOpen] = useState(defaultOpen);
 
+	function toggle() {
+		setOpen((o) => {
+			const next = !o;
+			onOpenChange?.(next);
+			return next;
+		});
+	}
+
 	return (
 		<View style={styles.container}>
-			<Pressable style={styles.header} onPress={() => setOpen((o) => !o)}>
+			<Pressable style={styles.header} onPress={toggle}>
 				<Text style={styles.title}>{title}</Text>
 				<Text style={styles.chevron}>{open ? "▾" : "▸"}</Text>
 			</Pressable>

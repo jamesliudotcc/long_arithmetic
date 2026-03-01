@@ -83,6 +83,7 @@ type State = {
 	subtractionSolution: SubtractionSolution;
 	subtractionWork: SubtractionWorkState;
 	visualSubWork: VisualSubWorkState;
+	toolboxOpen: boolean;
 };
 
 type Actions = {
@@ -97,6 +98,7 @@ type Actions = {
 	carryVisual: (place: Place, zone: VisualZone) => void;
 	setOperation: (op: "addition" | "subtraction") => void;
 	setSubtractionDifficulty: (difficulty: SubtractionDifficulty) => void;
+	setToolboxOpen: (open: boolean) => void;
 	enterSubtractionAnswer: (place: Place, digit: string) => void;
 	enterSubtractionBorrow: (place: Place, digit: string) => void;
 	enterSubtractionEffectiveValue: (place: Place, digit: string) => void;
@@ -309,6 +311,7 @@ export const useAdditionStore = create<State & Actions>()(
 			),
 			subtractionWork: initialSubtractionWork(),
 			visualSubWork: initialVisualSubWorkState,
+			toolboxOpen: false,
 
 			newProblem: () => {
 				const {
@@ -495,6 +498,10 @@ export const useAdditionStore = create<State & Actions>()(
 
 			setMode: (mode: Mode) => {
 				set({ mode }, false, "setMode");
+			},
+
+			setToolboxOpen: (open: boolean) => {
+				set({ toolboxOpen: open }, false, "setToolboxOpen");
 			},
 
 			moveVisualDisk: (place: Place, from: VisualZone) => {

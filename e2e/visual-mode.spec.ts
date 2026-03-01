@@ -2,18 +2,18 @@ import { type Page, expect, test } from "@playwright/test";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-async function openSettings(page: Page) {
-	// Expand the Settings collapsible section.
-	// .first() selects the section header even when AdminPanel's own "Settings"
-	// heading is also visible after expansion.
-	await page.getByText("Settings").first().click();
+async function openToolbox(page: Page) {
+	await page.getByText("☰").click();
+}
+
+async function closeToolbox(page: Page) {
+	await page.getByText("✕").click();
 }
 
 async function switchToVisualMode(page: Page) {
-	await openSettings(page);
+	await openToolbox(page);
 	await page.getByTestId("mode-btn-visual").click();
-	// Close the Settings section so the quiz area is compact before drag operations
-	await page.getByText("Settings").first().click();
+	await closeToolbox(page);
 }
 
 function diskLocator(page: Page, zone: "top" | "bottom", place: string) {
@@ -182,8 +182,8 @@ test.describe("Visual mode", () => {
 			await solveColumn(page, place);
 		}
 		await expect(page.getByTestId("visual-correct-banner")).toBeVisible();
-		// Expand Statistics section and verify an attempt was recorded
-		await page.getByText("Statistics").click();
+		// Open toolbox and verify an attempt was recorded in Statistics (open by default)
+		await openToolbox(page);
 		await expect(page.getByText(/attempted/)).toBeVisible();
 	});
 
@@ -209,9 +209,10 @@ test.describe("Visual mode", () => {
 		page,
 	}) => {
 		await switchToVisualMode(page);
-		// switchToVisualMode closes Settings; re-open to access mode buttons
-		await openSettings(page);
+		// Re-open toolbox to access mode buttons
+		await openToolbox(page);
 		await page.getByTestId("mode-btn-digit").click();
+		await closeToolbox(page);
 		await expect(page.getByTestId("addition-problem-solver")).toBeVisible();
 		await expect(page.getByTestId("visual-problem-solver")).not.toBeVisible();
 	});
