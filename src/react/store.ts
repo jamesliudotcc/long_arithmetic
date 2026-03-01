@@ -275,7 +275,8 @@ function recordAttemptInternal(
 	numPlaces: 1 | 2 | 3 | 4,
 	correct: boolean,
 ): void {
-	const attempt = createAttempt(numPlaces, correct);
+	const mode = useAdditionStore.getState().mode;
+	const attempt = createAttempt(numPlaces, correct, mode);
 	_storage.saveAttempt(attempt);
 	useAdditionStore.setState(
 		(s) => ({ attempts: [...s.attempts, attempt] }),
@@ -300,7 +301,7 @@ export const useAdditionStore = create<State & Actions>()(
 			solution: computeSolution(initialProblem),
 			work: initialWork(),
 			visualWork: initialVisualWork(initialProblem),
-			mode: "digit" as Mode,
+			mode: "visual" as Mode,
 			attempts: [],
 			periodStart: midnightToday(),
 			operation: "addition" as "addition" | "subtraction",

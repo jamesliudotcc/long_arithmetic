@@ -5,7 +5,7 @@ import { useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function SubtractionScreen() {
 	const { numDigits: rawNumDigits, numBorrows: rawNumBorrows } =
@@ -79,7 +79,7 @@ export default function SubtractionScreen() {
 	}, [subtractionDifficulty]);
 
 	return (
-		<View style={styles.page}>
+		<ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
 			{/* Quiz area — plain View so pointer events reach the solvers */}
 			<View style={styles.quizArea}>
 				<View style={styles.header}>
@@ -112,7 +112,7 @@ export default function SubtractionScreen() {
 			</View>
 
 			<Toolbox />
-		</View>
+		</ScrollView>
 	);
 }
 
@@ -120,6 +120,9 @@ const styles = StyleSheet.create({
 	page: {
 		flex: 1,
 		backgroundColor: colors.background,
+	},
+	pageContent: {
+		flexGrow: 1,
 	},
 	quizArea: {
 		alignItems: "center",

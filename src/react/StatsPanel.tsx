@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 type Period = "all" | "today";
+type ModeFilter = "all" | "digit" | "visual";
 
 const DIGIT_LABELS: Record<1 | 2 | 3 | 4, string> = {
 	1: "1 digit",
@@ -12,56 +13,78 @@ const DIGIT_LABELS: Record<1 | 2 | 3 | 4, string> = {
 	4: "4 digits",
 };
 
+function midnightToday(): number {
+	const d = new Date();
+	d.setHours(0, 0, 0, 0);
+	return d.getTime();
+}
+
 export function StatsPanel() {
 	const attempts = useAdditionStore((s) => s.attempts);
 	const periodStart = useAdditionStore((s) => s.periodStart);
 	const resetPeriod = useAdditionStore((s) => s.resetPeriod);
 
 	const [period, setPeriod] = useState<Period>("all");
+	const [modeFilter, setModeFilter] = useState<ModeFilter>("all");
 
-	const filtered =
-		period === "today"
-			? attempts.filter((a) => a.timestamp >= periodStart)
-			: attempts;
+	// Use the later of periodStart (manual reset) or today's midnight,
+	// so "Today" always means the current calendar day even if periodStart is stale.
+	const todayStart = Math.max(periodStart, midnightToday());
+	const filtered = attempts
+		.filter((a) => period === "all" || a.timestamp >= todayStart)
+		.filter((a) => {
+			if (modeFilter === "all") return true;
+			// Old attempts without a mode field are treated as digit
+			return (a.mode ?? "digit") === modeFilter;
+		});
 
 	return (
 		<View style={styles.panel}>
 			<View style={styles.toggleRow}>
-				<Pressable
-					style={[
-						styles.toggleButton,
-						period === "all" && styles.toggleButtonActive,
-					]}
-					onPress={() => setPeriod("all")}
-				>
-					<Text
+				{(["all", "today"] as const).map((p) => (
+					<Pressable
+						key={p}
 						style={[
-							styles.toggleText,
-							period === "all" && styles.toggleTextActive,
+							styles.toggleButton,
+							period === p && styles.toggleButtonActive,
 						]}
+						onPress={() => setPeriod(p)}
 					>
-						All Time
-					</Text>
-				</Pressable>
-				<Pressable
-					style={[
-						styles.toggleButton,
-						period === "today" && styles.toggleButtonActive,
-					]}
-					onPress={() => setPeriod("today")}
-				>
-					<Text
-						style={[
-							styles.toggleText,
-							period === "today" && styles.toggleTextActive,
-						]}
-					>
-						Today
-					</Text>
-				</Pressable>
+						<Text
+							style={[
+								styles.toggleText,
+								period === p && styles.toggleTextActive,
+							]}
+						>
+							{p === "all" ? "All Time" : "Today"}
+						</Text>
+					</Pressable>
+				))}
 				<Pressable style={styles.resetButton} onPress={resetPeriod}>
 					<Text style={styles.resetText}>↺ Reset</Text>
 				</Pressable>
+			</View>
+
+			<View style={styles.toggleRow}>
+				{(["all", "digit", "visual"] as const).map((m) => (
+					<Pressable
+						key={m}
+						style={[
+							styles.toggleButton,
+							modeFilter === m && styles.toggleButtonActive,
+						]}
+						onPress={() => setModeFilter(m)}
+					>
+						<Text
+							style={[
+								styles.toggleText,
+								modeFilter === m && styles.toggleTextActive,
+							]}
+						>
+							{m === "all" ? "All Modes" : m === "digit" ? "Digit" : "Visual"}
+						</Text>
+					</Pressable>
+				))}
 			</View>
 
 			<View style={styles.rows}>

@@ -5,7 +5,7 @@ import { useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function AdditionScreen() {
 	const {
@@ -85,7 +85,7 @@ export default function AdditionScreen() {
 	}, [difficulty, mode]);
 
 	return (
-		<View style={styles.page}>
+		<ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
 			{/* Quiz area — plain View so pointer events reach VisualProblemSolver */}
 			<View style={styles.quizArea}>
 				<View style={styles.header}>
@@ -118,7 +118,7 @@ export default function AdditionScreen() {
 			</View>
 
 			<Toolbox />
-		</View>
+		</ScrollView>
 	);
 }
 
@@ -126,6 +126,9 @@ const styles = StyleSheet.create({
 	page: {
 		flex: 1,
 		backgroundColor: colors.background,
+	},
+	pageContent: {
+		flexGrow: 1,
 	},
 	quizArea: {
 		alignItems: "center",

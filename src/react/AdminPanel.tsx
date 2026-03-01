@@ -63,19 +63,29 @@ export function AdminPanel() {
 	function handleSwitchOperation(target: "addition" | "subtraction") {
 		if (target === operation) return;
 		if (target === "subtraction") {
+			const numPlaces = difficulty.numPlaces;
+			const numBorrows = Math.min(
+				difficulty.numCarries,
+				numPlaces - 1,
+			) as SubtractionDifficulty["numBorrows"];
 			router.push({
 				pathname: "/subtraction",
 				params: {
-					numDigits: String(subtractionDifficulty.numPlaces),
-					numBorrows: String(subtractionDifficulty.numBorrows),
+					numDigits: String(numPlaces),
+					numBorrows: String(numBorrows),
 				},
 			});
 		} else {
+			const numPlaces = subtractionDifficulty.numPlaces;
+			const numCarries = Math.min(
+				subtractionDifficulty.numBorrows,
+				numPlaces,
+			) as AdditionDifficulty["numCarries"];
 			router.push({
 				pathname: "/addition",
 				params: {
-					numDigits: String(difficulty.numPlaces),
-					numCarries: String(difficulty.numCarries),
+					numDigits: String(numPlaces),
+					numCarries: String(numCarries),
 				},
 			});
 		}
@@ -249,10 +259,11 @@ const styles = StyleSheet.create({
 	},
 	buttonRow: {
 		flexDirection: "row",
+		flexWrap: "wrap",
 		gap: spacing.sm,
 	},
 	optionButton: {
-		width: 48,
+		minWidth: 48,
 		height: 48,
 		borderRadius: radius.md,
 		borderWidth: 1,
@@ -265,7 +276,7 @@ const styles = StyleSheet.create({
 		width: 72,
 	},
 	operationOptionButton: {
-		width: 104,
+		paddingHorizontal: spacing.sm,
 	},
 	optionButtonActive: {
 		backgroundColor: colors.primary,
