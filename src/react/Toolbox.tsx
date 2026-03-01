@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
 		backgroundColor: "rgba(0,0,0,0.3)",
 	},
 	panel: {
-		width: 320,
+		width: 360,
 		backgroundColor: colors.background,
 		borderLeftWidth: 1,
 		borderLeftColor: colors.border,
