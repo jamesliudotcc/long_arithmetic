@@ -51,10 +51,10 @@ build.web.dist: ## Export web build explicitly to dist/
 	bunx expo export --platform web --output-dir dist
 
 build.ios: ## EAS build for iOS (preview)
-	bunx eas build --platform ios --profile preview
+	eas build --platform ios --profile preview
 
 build.android: ## EAS build for Android (preview)
-	bunx eas build --platform android --profile preview
+	eas build --platform android --profile preview
 
 build.native: ## EAS build for both platforms (preview)
-	bunx eas build --platform all --profile preview
+	eas build --platform all --profile preview
