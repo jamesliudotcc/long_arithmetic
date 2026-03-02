@@ -1,4 +1,4 @@
-.PHONY: help install clean chingon lint format typecheck build.web build.web.dist build.ios build.android build.native serve.web run test.unit test.e2e test.e2e.ui test
+.PHONY: help install clean chingon lint format typecheck build.web build.web.dist build.ios build.android build.native serve.web run test.unit test.e2e test.e2e.ui test icons
 
 help: ## Show this help
 	@grep -hE '^[a-z0-9._]+:.*##' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-20s %s\n", $$1, $$2}'
@@ -6,6 +6,9 @@ help: ## Show this help
 # Install
 install: ## Install dependencies
 	bun install
+
+icons: ## Regenerate app icons from scripts/generate-icons.ts
+	bun run scripts/generate-icons.ts
 
 clean: ## Remove node_modules, dist, and build artifacts
 	rm -rf node_modules dist src/web/app.js src/web/sw.js

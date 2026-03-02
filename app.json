@@ -4,18 +4,24 @@
 		"slug": "long-arithmetic",
 		"version": "1.0.0",
 		"scheme": "longarithmetic",
+		"icon": "./assets/icon.png",
 		"orientation": "portrait",
 		"platforms": ["web", "ios", "android"],
 		"web": {
 			"bundler": "metro",
-			"output": "single"
+			"output": "single",
+			"favicon": "./assets/favicon.png"
 		},
 		"ios": {
 			"supportsTablet": true,
 			"bundleIdentifier": "com.jamesliudotcc.longarithmetic"
 		},
 		"android": {
-			"package": "com.jamesliudotcc.longarithmetic"
+			"package": "com.jamesliudotcc.longarithmetic",
+			"adaptiveIcon": {
+				"foregroundImage": "./assets/adaptive-icon.png",
+				"backgroundColor": "#0172ad"
+			}
 		},
 		"experiments": {
 			"baseUrl": "/long_arithmetic/"
