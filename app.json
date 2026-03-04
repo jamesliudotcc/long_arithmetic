@@ -5,7 +5,7 @@
 		"version": "1.0.0",
 		"scheme": "longarithmetic",
 		"icon": "./assets/icon.png",
-		"orientation": "portrait",
+		"orientation": "default",
 		"platforms": ["web", "ios", "android"],
 		"web": {
 			"bundler": "metro",
