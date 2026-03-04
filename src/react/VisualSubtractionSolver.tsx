@@ -3,6 +3,7 @@ import { canBorrowFrom as domainCanBorrowFrom } from "@domain/visual-subtraction
 import { PlaceDiscs } from "@react/PlaceDiscs";
 import { useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
+import { getPointerCount } from "@react/useThreeFingerPan";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -71,20 +72,29 @@ export function VisualSubtractionSolver() {
 		document.body.style.cursor = "grabbing";
 
 		function handleMove(e: PointerEvent) {
+			if (getPointerCount() >= 3) {
+				setDraggingFrom(null);
+				return;
+			}
 			ghost.style.left = `${e.clientX + 14}px`;
 			ghost.style.top = `${e.clientY + 14}px`;
 		}
 		function handleUp(e: PointerEvent) {
 			handleDropByClientCoords(e.clientX, e.clientY);
 		}
+		function handleCancel() {
+			setDraggingFrom(null);
+		}
 		window.addEventListener("pointermove", handleMove);
 		window.addEventListener("pointerup", handleUp);
+		window.addEventListener("pointercancel", handleCancel);
 
 		return () => {
 			document.body.removeChild(ghost);
 			document.body.style.cursor = "";
 			window.removeEventListener("pointermove", handleMove);
 			window.removeEventListener("pointerup", handleUp);
+			window.removeEventListener("pointercancel", handleCancel);
 		};
 	}, [draggingFrom]);
 

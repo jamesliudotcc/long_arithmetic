@@ -1,4 +1,5 @@
 import { colors, radius, spacing } from "@react/theme";
+import { getPointerCount } from "@react/useThreeFingerPan";
 import { StyleSheet, Text, View } from "react-native";
 
 const DISC_SIZE = 36;
@@ -44,6 +45,15 @@ export function PlaceDiscs({
 
 	function handleGridPointerDown(e: React.PointerEvent) {
 		if (!canCarry) return;
+		if (getPointerCount() >= 3) return; // let useThreeFingerPan handle it
+		e.preventDefault();
+		try {
+			// Pointer capture routes touchmove/pointerup back to this element.
+			// May throw for synthetic events (e.g. e2e tests) — safe to ignore.
+			(e.currentTarget as Element).setPointerCapture(e.pointerId);
+		} catch {
+			// no-op
+		}
 		onCarryDragStart?.();
 	}
 
@@ -110,6 +120,8 @@ const styles = StyleSheet.create({
 		borderWidth: 2,
 		// @ts-ignore — web-only
 		cursor: "grab",
+		// @ts-ignore — web-only
+		touchAction: "none",
 	},
 	discGridDragSource: {
 		opacity: 0.4,
