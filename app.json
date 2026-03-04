@@ -32,6 +32,12 @@
 			}
 		},
 		"owner": "jamesliudotai",
-		"plugins": ["expo-router"]
+		"plugins": ["expo-router"],
+		"runtimeVersion": {
+			"policy": "appVersion"
+		},
+		"updates": {
+			"url": "https://u.expo.dev/6191c702-455b-4d90-a7f9-6fc0d2ada2d3"
+		}
 	}
 }
