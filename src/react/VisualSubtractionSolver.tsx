@@ -74,12 +74,17 @@ export function VisualSubtractionSolver() {
 			ghost.style.left = `${e.clientX + 14}px`;
 			ghost.style.top = `${e.clientY + 14}px`;
 		}
+		function handleUp(e: PointerEvent) {
+			handleDropByClientCoords(e.clientX, e.clientY);
+		}
 		window.addEventListener("pointermove", handleMove);
+		window.addEventListener("pointerup", handleUp);
 
 		return () => {
 			document.body.removeChild(ghost);
 			document.body.style.cursor = "";
 			window.removeEventListener("pointermove", handleMove);
+			window.removeEventListener("pointerup", handleUp);
 		};
 	}, [draggingFrom]);
 
@@ -215,10 +220,6 @@ export function VisualSubtractionSolver() {
 			// @ts-ignore — web-only
 			data-testid="visual-sub-solver"
 			testID="visual-sub-solver"
-			// @ts-ignore — web pointer event
-			onPointerUp={(e: React.PointerEvent) =>
-				handleDropByClientCoords(e.clientX, e.clientY)
-			}
 		>
 			<View style={styles.columnsRow}>
 				{activePlaces.map((place) => renderColumn(place))}

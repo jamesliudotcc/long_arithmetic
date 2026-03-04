@@ -36,7 +36,13 @@ describe("InMemoryStorage", () => {
 
 		it("saveAttempt / getAttempts round-trips", () => {
 			const storage = new InMemoryStorage();
-			const attempt = { numPlaces: 2 as const, correct: true, timestamp: 1000 };
+			const attempt = {
+				numPlaces: 2 as const,
+				correct: true,
+				mode: "digit" as const,
+				operation: "addition" as const,
+				timestamp: 1000,
+			};
 			storage.saveAttempt(attempt);
 			expect(storage.getAttempts()).toEqual([attempt]);
 		});
@@ -46,11 +52,15 @@ describe("InMemoryStorage", () => {
 			storage.saveAttempt({
 				numPlaces: 1 as const,
 				correct: true,
+				mode: "digit" as const,
+				operation: "addition" as const,
 				timestamp: 1,
 			});
 			storage.saveAttempt({
 				numPlaces: 2 as const,
 				correct: false,
+				mode: "visual" as const,
+				operation: "subtraction" as const,
 				timestamp: 2,
 			});
 			expect(storage.getAttempts()).toHaveLength(2);
@@ -61,10 +71,18 @@ describe("InMemoryStorage", () => {
 			storage.saveAttempt({
 				numPlaces: 1 as const,
 				correct: true,
+				mode: "digit" as const,
+				operation: "addition" as const,
 				timestamp: 1,
 			});
 			const first = storage.getAttempts();
-			first.push({ numPlaces: 3 as const, correct: false, timestamp: 99 });
+			first.push({
+				numPlaces: 3 as const,
+				correct: false,
+				mode: "digit" as const,
+				operation: "addition" as const,
+				timestamp: 99,
+			});
 			expect(storage.getAttempts()).toHaveLength(1);
 		});
 
@@ -73,6 +91,8 @@ describe("InMemoryStorage", () => {
 			storage.saveAttempt({
 				numPlaces: 1 as const,
 				correct: true,
+				mode: "digit" as const,
+				operation: "addition" as const,
 				timestamp: 1,
 			});
 			storage.clearAttempts();

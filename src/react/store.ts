@@ -32,7 +32,6 @@ import {
 } from "@domain/visual-subtraction";
 import { InMemoryStorage } from "@infrastructure/in-memory-storage";
 import { create } from "zustand";
-import { devtools } from "zustand/middleware";
 
 export type CellStatus = "idle" | "correct" | "incorrect";
 
@@ -278,11 +277,7 @@ function recordAttemptInternal(
 	const { mode, operation } = useAdditionStore.getState();
 	const attempt = createAttempt(numPlaces, correct, mode, operation);
 	_storage.saveAttempt(attempt);
-	useAdditionStore.setState(
-		(s) => ({ attempts: [...s.attempts, attempt] }),
-		false,
-		"recordAttempt" as string,
-	);
+	useAdditionStore.setState((s) => ({ attempts: [...s.attempts, attempt] }));
 }
 
 const initialProblem = generateAdditionProblem(DEFAULT_DIFFICULTY);
@@ -293,483 +288,420 @@ const initialVisualSubWorkState = initialVisualSubWork(
 	initialSubtractionProblem,
 );
 
-export const useAdditionStore = create<State & Actions>()(
-	devtools(
-		(set, get) => ({
-			difficulty: DEFAULT_DIFFICULTY,
-			problem: initialProblem,
-			solution: computeSolution(initialProblem),
+export const useAdditionStore = create<State & Actions>()((set, get) => ({
+	difficulty: DEFAULT_DIFFICULTY,
+	problem: initialProblem,
+	solution: computeSolution(initialProblem),
+	work: initialWork(),
+	visualWork: initialVisualWork(initialProblem),
+	mode: "visual" as Mode,
+	attempts: [],
+	periodStart: midnightToday(),
+	operation: "addition" as "addition" | "subtraction",
+	subtractionDifficulty: DEFAULT_SUBTRACTION_DIFFICULTY,
+	subtractionProblem: initialSubtractionProblem,
+	subtractionSolution: computeSubtractionSolution(initialSubtractionProblem),
+	subtractionWork: initialSubtractionWork(),
+	visualSubWork: initialVisualSubWorkState,
+	toolboxOpen: false,
+
+	newProblem: () => {
+		const {
+			operation,
+			work,
+			visualWork,
+			problem,
+			subtractionWork,
+			visualSubWork,
+			subtractionProblem,
+			difficulty,
+			subtractionDifficulty,
+			mode,
+		} = get();
+
+		if (operation === "subtraction") {
+			const subActiveSolved =
+				mode === "visual" ? visualSubWork.solved : subtractionWork.solved;
+			if (!subActiveSolved) {
+				recordAttemptInternal(subtractionProblem.numPlaces, false);
+			}
+			const newProb = generateSubtractionProblem(subtractionDifficulty);
+			set({
+				subtractionProblem: newProb,
+				subtractionSolution: computeSubtractionSolution(newProb),
+				subtractionWork: initialSubtractionWork(),
+				visualSubWork: initialVisualSubWork(newProb),
+			});
+		} else {
+			const activeModeSolved =
+				mode === "visual" ? visualWork.solved : work.solved;
+			if (!activeModeSolved) {
+				recordAttemptInternal(problem.numPlaces, false);
+			}
+			const newProb = generateAdditionProblem(difficulty);
+			set({
+				problem: newProb,
+				solution: computeSolution(newProb),
+				work: initialWork(),
+				visualWork: initialVisualWork(newProb),
+			});
+		}
+	},
+
+	setDifficulty: (difficulty: AdditionDifficulty) => {
+		const { work, visualWork, problem, mode } = get();
+		const activeModeSolved =
+			mode === "visual" ? visualWork.solved : work.solved;
+		if (!activeModeSolved) {
+			recordAttemptInternal(problem.numPlaces, false);
+		}
+		const clamped: AdditionDifficulty = {
+			numPlaces: difficulty.numPlaces,
+			numCarries: Math.min(
+				difficulty.numCarries,
+				difficulty.numPlaces,
+			) as AdditionDifficulty["numCarries"],
+		};
+		_storage.saveDifficulty(clamped);
+		const newProb = generateAdditionProblem(clamped);
+		set({
+			difficulty: clamped,
+			problem: newProb,
+			solution: computeSolution(newProb),
 			work: initialWork(),
-			visualWork: initialVisualWork(initialProblem),
-			mode: "visual" as Mode,
-			attempts: [],
-			periodStart: midnightToday(),
-			operation: "addition" as "addition" | "subtraction",
-			subtractionDifficulty: DEFAULT_SUBTRACTION_DIFFICULTY,
-			subtractionProblem: initialSubtractionProblem,
-			subtractionSolution: computeSubtractionSolution(
-				initialSubtractionProblem,
-			),
+			visualWork: initialVisualWork(newProb),
+		});
+	},
+
+	enterAnswer: (place: Place, digit: string) => {
+		const { solution, work, problem } = get();
+		const index = PLACES.indexOf(place);
+		if (index > work.unlockedUpTo) return;
+
+		const col = solution.columns[place];
+		const correct = digit === String(col.answerDigit);
+		const answerStatus: CellStatus = correct ? "correct" : "incorrect";
+
+		const updatedEntries: Record<Place, PlaceWorkEntry> = {
+			...work.entries,
+			[place]: {
+				...work.entries[place],
+				answer: digit,
+				answerStatus,
+			},
+		};
+
+		const advance = advanceIfComplete(
+			index,
+			updatedEntries,
+			work,
+			solution,
+			problem.numPlaces,
+		);
+
+		if (advance.solved === true) {
+			recordAttemptInternal(problem.numPlaces, true);
+		}
+
+		set({ work: { ...work, entries: updatedEntries, ...advance } });
+	},
+
+	enterCarry: (place: Place, digit: string) => {
+		const { solution, work, problem } = get();
+		const index = PLACES.indexOf(place);
+		if (index > work.unlockedUpTo) return;
+
+		const col = solution.columns[place];
+		const correct = digit === String(col.carryOut);
+		const carryStatus: CellStatus = correct ? "correct" : "incorrect";
+
+		const updatedEntries: Record<Place, PlaceWorkEntry> = {
+			...work.entries,
+			[place]: {
+				...work.entries[place],
+				carry: digit,
+				carryStatus,
+			},
+		};
+
+		const advance = advanceIfComplete(
+			index,
+			updatedEntries,
+			work,
+			solution,
+			problem.numPlaces,
+		);
+
+		if (advance.solved === true) {
+			recordAttemptInternal(problem.numPlaces, true);
+		}
+
+		set({ work: { ...work, entries: updatedEntries, ...advance } });
+	},
+
+	enterFinalCarry: (digit: string) => {
+		const { solution, work, problem } = get();
+		const correct = digit === String(solution.finalCarryOut);
+		const finalCarryStatus: CellStatus = correct ? "correct" : "incorrect";
+
+		if (correct) {
+			recordAttemptInternal(problem.numPlaces, true);
+		}
+
+		set({
+			work: {
+				...work,
+				finalCarry: digit,
+				finalCarryStatus,
+				solved: correct,
+			},
+		});
+	},
+
+	resetPeriod: () => {
+		const ts = Date.now();
+		_storage.savePeriodStart(ts);
+		set({ periodStart: ts });
+	},
+
+	setMode: (mode: Mode) => {
+		set({ mode });
+	},
+
+	setToolboxOpen: (open: boolean) => {
+		set({ toolboxOpen: open });
+	},
+
+	moveVisualDisk: (place: Place, from: VisualZone) => {
+		const { visualWork, problem } = get();
+		const newWork = applyMoveDisk(visualWork, place, from, problem.numPlaces);
+		if (newWork.solved && !visualWork.solved) {
+			recordAttemptInternal(problem.numPlaces, true);
+		}
+		set({ visualWork: newWork });
+	},
+
+	carryVisual: (place: Place, zone: VisualZone) => {
+		const { visualWork, problem } = get();
+		const newWork = applyCarryOut(visualWork, place, zone, problem.numPlaces);
+		if (newWork.solved && !visualWork.solved) {
+			recordAttemptInternal(problem.numPlaces, true);
+		}
+		set({ visualWork: newWork });
+	},
+
+	setOperation: (op: "addition" | "subtraction") => {
+		const {
+			operation,
+			work,
+			visualWork,
+			problem,
+			subtractionWork,
+			visualSubWork,
+			subtractionProblem,
+			mode,
+		} = get();
+		if (operation === op) return;
+
+		if (operation === "addition") {
+			const activeModeSolved =
+				mode === "visual" ? visualWork.solved : work.solved;
+			if (!activeModeSolved) {
+				recordAttemptInternal(problem.numPlaces, false);
+			}
+		} else {
+			const subActiveSolved =
+				mode === "visual" ? visualSubWork.solved : subtractionWork.solved;
+			if (!subActiveSolved) {
+				recordAttemptInternal(subtractionProblem.numPlaces, false);
+			}
+		}
+
+		set({ operation: op });
+	},
+
+	setSubtractionDifficulty: (difficulty: SubtractionDifficulty) => {
+		const { subtractionWork, visualSubWork, subtractionProblem, mode } = get();
+		const subActiveSolved =
+			mode === "visual" ? visualSubWork.solved : subtractionWork.solved;
+		if (!subActiveSolved) {
+			recordAttemptInternal(subtractionProblem.numPlaces, false);
+		}
+		const clampedBorrows = Math.min(
+			difficulty.numBorrows,
+			difficulty.numPlaces - 1,
+		);
+		const clamped: SubtractionDifficulty = {
+			numPlaces: difficulty.numPlaces,
+			numBorrows: clampedBorrows as SubtractionDifficulty["numBorrows"],
+		};
+		_storage.saveSubtractionDifficulty(clamped);
+		const newProb = generateSubtractionProblem(clamped);
+		set({
+			subtractionDifficulty: clamped,
+			subtractionProblem: newProb,
+			subtractionSolution: computeSubtractionSolution(newProb),
 			subtractionWork: initialSubtractionWork(),
-			visualSubWork: initialVisualSubWorkState,
-			toolboxOpen: false,
+			visualSubWork: initialVisualSubWork(newProb),
+		});
+	},
 
-			newProblem: () => {
-				const {
-					operation,
-					work,
-					visualWork,
-					problem,
-					subtractionWork,
-					visualSubWork,
-					subtractionProblem,
-					difficulty,
-					subtractionDifficulty,
-					mode,
-				} = get();
+	enterSubtractionAnswer: (place: Place, digit: string) => {
+		const { subtractionSolution, subtractionWork, subtractionProblem } = get();
+		const index = PLACES.indexOf(place);
+		if (index > subtractionWork.unlockedUpTo) return;
 
-				if (operation === "subtraction") {
-					const subActiveSolved =
-						mode === "visual" ? visualSubWork.solved : subtractionWork.solved;
-					if (!subActiveSolved) {
-						recordAttemptInternal(subtractionProblem.numPlaces, false);
-					}
-					const newProb = generateSubtractionProblem(subtractionDifficulty);
-					set(
-						{
-							subtractionProblem: newProb,
-							subtractionSolution: computeSubtractionSolution(newProb),
-							subtractionWork: initialSubtractionWork(),
-							visualSubWork: initialVisualSubWork(newProb),
-						},
-						false,
-						"newProblem",
-					);
-				} else {
-					const activeModeSolved =
-						mode === "visual" ? visualWork.solved : work.solved;
-					if (!activeModeSolved) {
-						recordAttemptInternal(problem.numPlaces, false);
-					}
-					const newProb = generateAdditionProblem(difficulty);
-					set(
-						{
-							problem: newProb,
-							solution: computeSolution(newProb),
-							work: initialWork(),
-							visualWork: initialVisualWork(newProb),
-						},
-						false,
-						"newProblem",
-					);
-				}
+		const col = subtractionSolution.columns[place];
+		const correct = digit === String(col.answerDigit);
+		const answerStatus: CellStatus = correct ? "correct" : "incorrect";
+
+		const updatedEntries: Record<Place, SubtractionPlaceWorkEntry> = {
+			...subtractionWork.entries,
+			[place]: {
+				...subtractionWork.entries[place],
+				answer: digit,
+				answerStatus,
 			},
+		};
 
-			setDifficulty: (difficulty: AdditionDifficulty) => {
-				const { work, visualWork, problem, mode } = get();
-				const activeModeSolved =
-					mode === "visual" ? visualWork.solved : work.solved;
-				if (!activeModeSolved) {
-					recordAttemptInternal(problem.numPlaces, false);
-				}
-				const clamped: AdditionDifficulty = {
-					numPlaces: difficulty.numPlaces,
-					numCarries: Math.min(
-						difficulty.numCarries,
-						difficulty.numPlaces,
-					) as AdditionDifficulty["numCarries"],
-				};
-				_storage.saveDifficulty(clamped);
-				const newProb = generateAdditionProblem(clamped);
-				set(
-					{
-						difficulty: clamped,
-						problem: newProb,
-						solution: computeSolution(newProb),
-						work: initialWork(),
-						visualWork: initialVisualWork(newProb),
-					},
-					false,
-					"setDifficulty",
-				);
+		const advance = subtractionAdvanceIfComplete(
+			index,
+			updatedEntries,
+			subtractionWork,
+			subtractionSolution,
+			subtractionProblem.numPlaces,
+		);
+
+		if (advance.solved === true) {
+			recordAttemptInternal(subtractionProblem.numPlaces, true);
+		}
+
+		set({
+			subtractionWork: {
+				...subtractionWork,
+				entries: updatedEntries,
+				...advance,
 			},
+		});
+	},
 
-			enterAnswer: (place: Place, digit: string) => {
-				const { solution, work, problem } = get();
-				const index = PLACES.indexOf(place);
-				if (index > work.unlockedUpTo) return;
+	enterSubtractionBorrow: (place: Place, digit: string) => {
+		const { subtractionSolution, subtractionWork, subtractionProblem } = get();
+		// place is the borrowed-from column (i+1); borrowing column is index-1
+		const index = PLACES.indexOf(place);
+		if (index - 1 !== subtractionWork.unlockedUpTo) return;
 
-				const col = solution.columns[place];
-				const correct = digit === String(col.answerDigit);
-				const answerStatus: CellStatus = correct ? "correct" : "incorrect";
+		const col = subtractionSolution.columns[place];
+		// Correct answer is the reduced digit written above the borrowed-from column
+		const correct = digit === String(col.effectiveTop);
+		const borrowStatus: CellStatus = correct ? "correct" : "incorrect";
 
-				const updatedEntries: Record<Place, PlaceWorkEntry> = {
-					...work.entries,
-					[place]: {
-						...work.entries[place],
-						answer: digit,
-						answerStatus,
-					},
-				};
-
-				const advance = advanceIfComplete(
-					index,
-					updatedEntries,
-					work,
-					solution,
-					problem.numPlaces,
-				);
-
-				if (advance.solved === true) {
-					recordAttemptInternal(problem.numPlaces, true);
-				}
-
-				set(
-					{ work: { ...work, entries: updatedEntries, ...advance } },
-					false,
-					"enterAnswer",
-				);
+		const updatedEntries: Record<Place, SubtractionPlaceWorkEntry> = {
+			...subtractionWork.entries,
+			[place]: {
+				...subtractionWork.entries[place],
+				borrow: digit,
+				borrowStatus,
 			},
+		};
 
-			enterCarry: (place: Place, digit: string) => {
-				const { solution, work, problem } = get();
-				const index = PLACES.indexOf(place);
-				if (index > work.unlockedUpTo) return;
+		// Advance based on the borrowing column (index-1)
+		const advance = subtractionAdvanceIfComplete(
+			index - 1,
+			updatedEntries,
+			subtractionWork,
+			subtractionSolution,
+			subtractionProblem.numPlaces,
+		);
 
-				const col = solution.columns[place];
-				const correct = digit === String(col.carryOut);
-				const carryStatus: CellStatus = correct ? "correct" : "incorrect";
+		if (advance.solved === true) {
+			recordAttemptInternal(subtractionProblem.numPlaces, true);
+		}
 
-				const updatedEntries: Record<Place, PlaceWorkEntry> = {
-					...work.entries,
-					[place]: {
-						...work.entries[place],
-						carry: digit,
-						carryStatus,
-					},
-				};
-
-				const advance = advanceIfComplete(
-					index,
-					updatedEntries,
-					work,
-					solution,
-					problem.numPlaces,
-				);
-
-				if (advance.solved === true) {
-					recordAttemptInternal(problem.numPlaces, true);
-				}
-
-				set(
-					{ work: { ...work, entries: updatedEntries, ...advance } },
-					false,
-					"enterCarry",
-				);
+		set({
+			subtractionWork: {
+				...subtractionWork,
+				entries: updatedEntries,
+				...advance,
 			},
+		});
+	},
 
-			enterFinalCarry: (digit: string) => {
-				const { solution, work, problem } = get();
-				const correct = digit === String(solution.finalCarryOut);
-				const finalCarryStatus: CellStatus = correct ? "correct" : "incorrect";
+	enterSubtractionEffectiveValue: (place: Place, digit: string) => {
+		const { subtractionSolution, subtractionWork, subtractionProblem } = get();
+		const index = PLACES.indexOf(place);
+		if (index !== subtractionWork.unlockedUpTo) return;
 
-				if (correct) {
-					recordAttemptInternal(problem.numPlaces, true);
-				}
+		const col = subtractionSolution.columns[place];
+		const correct = digit === String(col.effectiveTop + 10);
+		const effectiveValueStatus: CellStatus = correct ? "correct" : "incorrect";
 
-				set(
-					{
-						work: {
-							...work,
-							finalCarry: digit,
-							finalCarryStatus,
-							solved: correct,
-						},
-					},
-					false,
-					"enterFinalCarry",
-				);
+		const updatedEntries: Record<Place, SubtractionPlaceWorkEntry> = {
+			...subtractionWork.entries,
+			[place]: {
+				...subtractionWork.entries[place],
+				effectiveValue: digit,
+				effectiveValueStatus,
 			},
+		};
 
-			resetPeriod: () => {
-				const ts = Date.now();
-				_storage.savePeriodStart(ts);
-				set({ periodStart: ts }, false, "resetPeriod");
+		const advance = subtractionAdvanceIfComplete(
+			index,
+			updatedEntries,
+			subtractionWork,
+			subtractionSolution,
+			subtractionProblem.numPlaces,
+		);
+
+		if (advance.solved === true) {
+			recordAttemptInternal(subtractionProblem.numPlaces, true);
+		}
+
+		set({
+			subtractionWork: {
+				...subtractionWork,
+				entries: updatedEntries,
+				...advance,
 			},
+		});
+	},
 
-			setMode: (mode: Mode) => {
-				set({ mode }, false, "setMode");
-			},
+	cancelVisualSub: (place: Place) => {
+		const { visualSubWork, subtractionProblem } = get();
+		const newWork = applySubCancel(
+			visualSubWork,
+			place,
+			subtractionProblem.numPlaces,
+		);
+		if (newWork.solved && !visualSubWork.solved) {
+			recordAttemptInternal(subtractionProblem.numPlaces, true);
+		}
+		set({ visualSubWork: newWork });
+	},
 
-			setToolboxOpen: (open: boolean) => {
-				set({ toolboxOpen: open }, false, "setToolboxOpen");
-			},
+	moveBorrowDownVisualSub: (place: Place) => {
+		const { visualSubWork, subtractionProblem } = get();
+		const newWork = applySubMoveBorrowDown(
+			visualSubWork,
+			place,
+			subtractionProblem.numPlaces,
+		);
+		if (newWork.solved && !visualSubWork.solved) {
+			recordAttemptInternal(subtractionProblem.numPlaces, true);
+		}
+		set({ visualSubWork: newWork });
+	},
 
-			moveVisualDisk: (place: Place, from: VisualZone) => {
-				const { visualWork, problem } = get();
-				const newWork = applyMoveDisk(
-					visualWork,
-					place,
-					from,
-					problem.numPlaces,
-				);
-				if (newWork.solved && !visualWork.solved) {
-					recordAttemptInternal(problem.numPlaces, true);
-				}
-				set({ visualWork: newWork }, false, "moveVisualDisk");
-			},
-
-			carryVisual: (place: Place, zone: VisualZone) => {
-				const { visualWork, problem } = get();
-				const newWork = applyCarryOut(
-					visualWork,
-					place,
-					zone,
-					problem.numPlaces,
-				);
-				if (newWork.solved && !visualWork.solved) {
-					recordAttemptInternal(problem.numPlaces, true);
-				}
-				set({ visualWork: newWork }, false, "carryVisual");
-			},
-
-			setOperation: (op: "addition" | "subtraction") => {
-				const {
-					operation,
-					work,
-					visualWork,
-					problem,
-					subtractionWork,
-					visualSubWork,
-					subtractionProblem,
-					mode,
-				} = get();
-				if (operation === op) return;
-
-				if (operation === "addition") {
-					const activeModeSolved =
-						mode === "visual" ? visualWork.solved : work.solved;
-					if (!activeModeSolved) {
-						recordAttemptInternal(problem.numPlaces, false);
-					}
-				} else {
-					const subActiveSolved =
-						mode === "visual" ? visualSubWork.solved : subtractionWork.solved;
-					if (!subActiveSolved) {
-						recordAttemptInternal(subtractionProblem.numPlaces, false);
-					}
-				}
-
-				set({ operation: op }, false, "setOperation");
-			},
-
-			setSubtractionDifficulty: (difficulty: SubtractionDifficulty) => {
-				const { subtractionWork, visualSubWork, subtractionProblem, mode } =
-					get();
-				const subActiveSolved =
-					mode === "visual" ? visualSubWork.solved : subtractionWork.solved;
-				if (!subActiveSolved) {
-					recordAttemptInternal(subtractionProblem.numPlaces, false);
-				}
-				const clampedBorrows = Math.min(
-					difficulty.numBorrows,
-					difficulty.numPlaces - 1,
-				);
-				const clamped: SubtractionDifficulty = {
-					numPlaces: difficulty.numPlaces,
-					numBorrows: clampedBorrows as SubtractionDifficulty["numBorrows"],
-				};
-				_storage.saveSubtractionDifficulty(clamped);
-				const newProb = generateSubtractionProblem(clamped);
-				set(
-					{
-						subtractionDifficulty: clamped,
-						subtractionProblem: newProb,
-						subtractionSolution: computeSubtractionSolution(newProb),
-						subtractionWork: initialSubtractionWork(),
-						visualSubWork: initialVisualSubWork(newProb),
-					},
-					false,
-					"setSubtractionDifficulty",
-				);
-			},
-
-			enterSubtractionAnswer: (place: Place, digit: string) => {
-				const { subtractionSolution, subtractionWork, subtractionProblem } =
-					get();
-				const index = PLACES.indexOf(place);
-				if (index > subtractionWork.unlockedUpTo) return;
-
-				const col = subtractionSolution.columns[place];
-				const correct = digit === String(col.answerDigit);
-				const answerStatus: CellStatus = correct ? "correct" : "incorrect";
-
-				const updatedEntries: Record<Place, SubtractionPlaceWorkEntry> = {
-					...subtractionWork.entries,
-					[place]: {
-						...subtractionWork.entries[place],
-						answer: digit,
-						answerStatus,
-					},
-				};
-
-				const advance = subtractionAdvanceIfComplete(
-					index,
-					updatedEntries,
-					subtractionWork,
-					subtractionSolution,
-					subtractionProblem.numPlaces,
-				);
-
-				if (advance.solved === true) {
-					recordAttemptInternal(subtractionProblem.numPlaces, true);
-				}
-
-				set(
-					{
-						subtractionWork: {
-							...subtractionWork,
-							entries: updatedEntries,
-							...advance,
-						},
-					},
-					false,
-					"enterSubtractionAnswer",
-				);
-			},
-
-			enterSubtractionBorrow: (place: Place, digit: string) => {
-				const { subtractionSolution, subtractionWork, subtractionProblem } =
-					get();
-				// place is the borrowed-from column (i+1); borrowing column is index-1
-				const index = PLACES.indexOf(place);
-				if (index - 1 !== subtractionWork.unlockedUpTo) return;
-
-				const col = subtractionSolution.columns[place];
-				// Correct answer is the reduced digit written above the borrowed-from column
-				const correct = digit === String(col.effectiveTop);
-				const borrowStatus: CellStatus = correct ? "correct" : "incorrect";
-
-				const updatedEntries: Record<Place, SubtractionPlaceWorkEntry> = {
-					...subtractionWork.entries,
-					[place]: {
-						...subtractionWork.entries[place],
-						borrow: digit,
-						borrowStatus,
-					},
-				};
-
-				// Advance based on the borrowing column (index-1)
-				const advance = subtractionAdvanceIfComplete(
-					index - 1,
-					updatedEntries,
-					subtractionWork,
-					subtractionSolution,
-					subtractionProblem.numPlaces,
-				);
-
-				if (advance.solved === true) {
-					recordAttemptInternal(subtractionProblem.numPlaces, true);
-				}
-
-				set(
-					{
-						subtractionWork: {
-							...subtractionWork,
-							entries: updatedEntries,
-							...advance,
-						},
-					},
-					false,
-					"enterSubtractionBorrow",
-				);
-			},
-
-			enterSubtractionEffectiveValue: (place: Place, digit: string) => {
-				const { subtractionSolution, subtractionWork, subtractionProblem } =
-					get();
-				const index = PLACES.indexOf(place);
-				if (index !== subtractionWork.unlockedUpTo) return;
-
-				const col = subtractionSolution.columns[place];
-				const correct = digit === String(col.effectiveTop + 10);
-				const effectiveValueStatus: CellStatus = correct
-					? "correct"
-					: "incorrect";
-
-				const updatedEntries: Record<Place, SubtractionPlaceWorkEntry> = {
-					...subtractionWork.entries,
-					[place]: {
-						...subtractionWork.entries[place],
-						effectiveValue: digit,
-						effectiveValueStatus,
-					},
-				};
-
-				const advance = subtractionAdvanceIfComplete(
-					index,
-					updatedEntries,
-					subtractionWork,
-					subtractionSolution,
-					subtractionProblem.numPlaces,
-				);
-
-				if (advance.solved === true) {
-					recordAttemptInternal(subtractionProblem.numPlaces, true);
-				}
-
-				set(
-					{
-						subtractionWork: {
-							...subtractionWork,
-							entries: updatedEntries,
-							...advance,
-						},
-					},
-					false,
-					"enterSubtractionEffectiveValue",
-				);
-			},
-
-			cancelVisualSub: (place: Place) => {
-				const { visualSubWork, subtractionProblem } = get();
-				const newWork = applySubCancel(
-					visualSubWork,
-					place,
-					subtractionProblem.numPlaces,
-				);
-				if (newWork.solved && !visualSubWork.solved) {
-					recordAttemptInternal(subtractionProblem.numPlaces, true);
-				}
-				set({ visualSubWork: newWork }, false, "cancelVisualSub");
-			},
-
-			moveBorrowDownVisualSub: (place: Place) => {
-				const { visualSubWork, subtractionProblem } = get();
-				const newWork = applySubMoveBorrowDown(
-					visualSubWork,
-					place,
-					subtractionProblem.numPlaces,
-				);
-				if (newWork.solved && !visualSubWork.solved) {
-					recordAttemptInternal(subtractionProblem.numPlaces, true);
-				}
-				set({ visualSubWork: newWork }, false, "moveBorrowDownVisualSub");
-			},
-
-			borrowVisualSub: (fromPlace: Place) => {
-				const { visualSubWork, subtractionProblem } = get();
-				const newWork = applySubBorrowFrom(
-					visualSubWork,
-					fromPlace,
-					subtractionProblem.numPlaces,
-				);
-				if (newWork.solved && !visualSubWork.solved) {
-					recordAttemptInternal(subtractionProblem.numPlaces, true);
-				}
-				set({ visualSubWork: newWork }, false, "borrowVisualSub");
-			},
-		}),
-		{ name: "LongArithmetic" },
-	),
-);
+	borrowVisualSub: (fromPlace: Place) => {
+		const { visualSubWork, subtractionProblem } = get();
+		const newWork = applySubBorrowFrom(
+			visualSubWork,
+			fromPlace,
+			subtractionProblem.numPlaces,
+		);
+		if (newWork.solved && !visualSubWork.solved) {
+			recordAttemptInternal(subtractionProblem.numPlaces, true);
+		}
+		set({ visualSubWork: newWork });
+	},
+}));

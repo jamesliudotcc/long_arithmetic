@@ -53,7 +53,8 @@ async function dragDisk(
 }
 
 /** Drag a top zone onto the next column to carry a set of 10.
- *  Moves mouse to (0,0) first to ensure a clean entry into the source zone. */
+ *  Uses dispatchEvent so React's onPointerDown fires reliably, then waits
+ *  for React to process the state update before releasing. */
 async function carryZone(page: Page, place: string, targetPlace: string) {
 	const source = page.getByTestId(`visual-zone-top-${place}`);
 	const target = page.getByTestId(`visual-column-${targetPlace}`);
@@ -61,18 +62,26 @@ async function carryZone(page: Page, place: string, targetPlace: string) {
 	const targetBox = await target.boundingBox();
 	if (!sourceBox || !targetBox)
 		throw new Error("Could not get bounding box for carry");
-	await page.mouse.move(0, 0);
-	await page.mouse.move(
-		sourceBox.x + sourceBox.width / 2,
-		sourceBox.y + sourceBox.height / 2,
-	);
-	await page.mouse.down();
-	await page.mouse.move(
-		targetBox.x + targetBox.width / 2,
-		targetBox.y + targetBox.height / 2,
-		{ steps: 8 },
-	);
-	await page.mouse.up();
+	const sx = sourceBox.x + sourceBox.width / 2;
+	const sy = sourceBox.y + sourceBox.height / 2;
+	const tx = targetBox.x + targetBox.width / 2;
+	const ty = targetBox.y + targetBox.height / 2;
+	// Fire pointerdown directly on the zone element
+	await source.dispatchEvent("pointerdown", {
+		clientX: sx,
+		clientY: sy,
+		bubbles: true,
+		isPrimary: true,
+	});
+	// Give React time to process setDraggingFrom and install the window pointerup listener
+	await page.waitForTimeout(150);
+	// Fire pointerup on the target column
+	await target.dispatchEvent("pointerup", {
+		clientX: tx,
+		clientY: ty,
+		bubbles: true,
+		isPrimary: true,
+	});
 }
 
 /** Consolidate all disks into top zone, then carry out any 10-sets.
@@ -105,7 +114,7 @@ async function solveColumn(page: Page, place: string) {
 
 test.describe("Visual mode", () => {
 	test.beforeEach(async ({ page }) => {
-		await page.goto("/");
+		await page.goto("/addition");
 	});
 
 	test("switching to Visual mode renders visual solver and hides digit solver", async ({
@@ -184,7 +193,7 @@ test.describe("Visual mode", () => {
 		await expect(page.getByTestId("visual-correct-banner")).toBeVisible();
 		// Open toolbox and verify an attempt was recorded in Statistics (open by default)
 		await openToolbox(page);
-		await expect(page.getByText(/attempted/)).toBeVisible();
+		await expect(page.getByText(/completed/)).toBeVisible();
 	});
 
 	test("New Problem resets the visual work state", async ({ page }) => {
