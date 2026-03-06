@@ -4,7 +4,7 @@ import type { VisualZone } from "@domain/visual-addition";
 import { PlaceDiscs } from "@react/PlaceDiscs";
 import { useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
-import { getPointerCount } from "@react/useThreeFingerPan";
+import { getPointerCount, isPanning } from "@react/useThreeFingerPan";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -85,7 +85,7 @@ export function VisualProblemSolver() {
 		document.body.style.cursor = "grabbing";
 
 		function handleMove(e: PointerEvent) {
-			if (getPointerCount() >= 3) {
+			if (getPointerCount() >= 3 || isPanning()) {
 				setDraggingFrom(null);
 				return;
 			}

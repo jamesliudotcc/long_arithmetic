@@ -1,5 +1,5 @@
 import { colors, radius, spacing } from "@react/theme";
-import { getPointerCount } from "@react/useThreeFingerPan";
+import { getPointerCount, isPanning } from "@react/useThreeFingerPan";
 import { StyleSheet, Text, View } from "react-native";
 
 const DISC_SIZE = 36;
@@ -45,7 +45,7 @@ export function PlaceDiscs({
 
 	function handleGridPointerDown(e: React.PointerEvent) {
 		if (!canCarry) return;
-		if (getPointerCount() >= 3) return; // let useThreeFingerPan handle it
+		if (getPointerCount() >= 3 || isPanning()) return; // let useThreeFingerPan handle it
 		e.preventDefault();
 		try {
 			// Pointer capture routes touchmove/pointerup back to this element.
