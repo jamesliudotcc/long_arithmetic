@@ -1,11 +1,20 @@
 import { AdditionProblemSolver } from "@react/AdditionProblemSolver";
+import { ScrollContext } from "@react/ScrollContext";
 import { Toolbox } from "@react/Toolbox";
 import { VisualProblemSolver } from "@react/VisualProblemSolver";
 import { useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+	Pressable,
+	type ScrollView as RNScrollView,
+	StyleSheet,
+	Text,
+	View,
+	useWindowDimensions,
+} from "react-native";
+import { ScrollView } from "react-native-gesture-handler";
 
 export default function AdditionScreen() {
 	const {
@@ -25,6 +34,14 @@ export default function AdditionScreen() {
 	const setDifficulty = useAdditionStore((s) => s.setDifficulty);
 	const setMode = useAdditionStore((s) => s.setMode);
 	const setToolboxOpen = useAdditionStore((s) => s.setToolboxOpen);
+
+	const { height: windowHeight } = useWindowDimensions();
+	const scrollViewRef = useRef<RNScrollView>(null);
+	const scrollYRef = useRef(0);
+	const scrollTo = useCallback((y: number) => {
+		console.log("[scrollTo] y=", y, "ref=", scrollViewRef.current !== null);
+		scrollViewRef.current?.scrollTo({ y, animated: false });
+	}, []);
 
 	// On initial mount, sync URL params → store (handles deep links)
 	const didSyncRef = useRef(false);
@@ -85,40 +102,57 @@ export default function AdditionScreen() {
 	}, [difficulty, mode]);
 
 	return (
-		<ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
-			{/* Quiz area — plain View so pointer events reach VisualProblemSolver */}
-			<View style={styles.quizArea}>
-				<View style={styles.header}>
-					<Text style={styles.title}>Long Arithmetic</Text>
+		<ScrollContext.Provider value={{ scrollTo, scrollYRef }}>
+			<ScrollView
+				ref={scrollViewRef}
+				onScroll={(e) => {
+					scrollYRef.current = e.nativeEvent.contentOffset.y;
+				}}
+				scrollEventThrottle={16}
+				style={styles.page}
+				contentContainerStyle={[
+					styles.pageContent,
+					{ minHeight: windowHeight + 200 },
+				]}
+				onLayout={(e) =>
+					console.log("[scroll] viewportH=", e.nativeEvent.layout.height)
+				}
+				onContentSizeChange={(_w, h) => console.log("[scroll] contentH=", h)}
+			>
+				{/* Quiz area — plain View so pointer events reach VisualProblemSolver */}
+				<View style={styles.quizArea}>
+					<View style={styles.header}>
+						<Text style={styles.title}>Long Arithmetic</Text>
+						<Pressable
+							style={styles.hamburger}
+							onPress={() => setToolboxOpen(true)}
+						>
+							<Text style={styles.hamburgerText}>☰</Text>
+						</Pressable>
+					</View>
+
+					<View style={styles.problemCard}>
+						{mode === "visual" ? (
+							<VisualProblemSolver />
+						) : (
+							<AdditionProblemSolver />
+						)}
+					</View>
+
 					<Pressable
-						style={styles.hamburger}
-						onPress={() => setToolboxOpen(true)}
+						style={({ pressed }) => [
+							styles.button,
+							pressed && styles.buttonPressed,
+						]}
+						onPress={newProblem}
 					>
-						<Text style={styles.hamburgerText}>☰</Text>
+						<Text style={styles.buttonText}>New Problem</Text>
 					</Pressable>
 				</View>
 
-				<View style={styles.problemCard}>
-					{mode === "visual" ? (
-						<VisualProblemSolver />
-					) : (
-						<AdditionProblemSolver />
-					)}
-				</View>
-
-				<Pressable
-					style={({ pressed }) => [
-						styles.button,
-						pressed && styles.buttonPressed,
-					]}
-					onPress={newProblem}
-				>
-					<Text style={styles.buttonText}>New Problem</Text>
-				</Pressable>
-			</View>
-
-			<Toolbox />
-		</ScrollView>
+				<Toolbox />
+			</ScrollView>
+		</ScrollContext.Provider>
 	);
 }
 
@@ -128,7 +162,7 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.background,
 	},
 	pageContent: {
-		flexGrow: 1,
+		paddingBottom: spacing.xl,
 	},
 	quizArea: {
 		alignItems: "center",

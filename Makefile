@@ -39,7 +39,7 @@ test: test.unit test.e2e ## Run all tests (unit + e2e)
 
 # Dev / Build
 run: ## Start Expo dev server
-	bunx expo start
+	bunx expo start --clear
 
 serve.web: ## Start Expo web dev server
 	bunx expo start --web

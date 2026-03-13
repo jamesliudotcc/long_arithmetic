@@ -6,7 +6,11 @@ import { useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
 import { useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import {
+	Gesture,
+	GestureDetector,
+	ScrollView,
+} from "react-native-gesture-handler";
 
 // Mirror PlaceDiscs constants to size the overflow box to match column height
 const DISC_SIZE = 36;
@@ -67,6 +71,29 @@ export function VisualProblemSolver() {
 	);
 	const containerOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 	const columnsRowRef = useRef<View>(null);
+
+	// Horizontal scroll for the columns strip
+	const columnsScrollRef = useRef<ScrollView>(null);
+	const columnsScrollX = useRef(0);
+	const startScrollX = useRef(0);
+
+	const threeFingerPan = Gesture.Pan()
+		.minPointers(3)
+		.runOnJS(true)
+		.onBegin(() => {
+			console.log("[pan] onBegin scrollX=", columnsScrollX.current);
+			startScrollX.current = columnsScrollX.current;
+		})
+		.onUpdate((e) => {
+			const targetX = startScrollX.current - e.translationX;
+			console.log(
+				"[pan] onUpdate translationX=",
+				e.translationX,
+				"targetX=",
+				targetX,
+			);
+			columnsScrollRef.current?.scrollTo({ x: targetX, animated: false });
+		});
 
 	// Active places most-significant first for display
 	const activePlaces = PLACES.slice(0, numPlaces).reverse() as Place[];
@@ -167,6 +194,7 @@ export function VisualProblemSolver() {
 		}
 
 		const topPanGesture = Gesture.Pan()
+			.maxPointers(1)
 			.runOnJS(true)
 			.onBegin(() => {
 				if (!locked && topCanCarry) {
@@ -181,6 +209,7 @@ export function VisualProblemSolver() {
 			});
 
 		const bottomPanGesture = Gesture.Pan()
+			.maxPointers(1)
 			.runOnJS(true)
 			.onBegin(() => {
 				if (!locked && bottomCanCarry) {
@@ -259,18 +288,32 @@ export function VisualProblemSolver() {
 			data-testid="visual-problem-solver"
 			testID="visual-problem-solver"
 		>
-			<View
-				ref={columnsRowRef}
-				style={styles.columnsRow}
-				onLayout={() => {
-					columnsRowRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
-						containerOffset.current = { x: pageX, y: pageY };
-					});
-				}}
-			>
-				{showOverflow && renderColumn("overflow")}
-				{activePlaces.map((place) => renderColumn(place))}
-			</View>
+			<GestureDetector gesture={threeFingerPan}>
+				<ScrollView
+					ref={columnsScrollRef}
+					horizontal
+					scrollEnabled={false}
+					showsHorizontalScrollIndicator={false}
+					scrollEventThrottle={16}
+					style={styles.columnsScroll}
+					onScroll={(e) => {
+						columnsScrollX.current = e.nativeEvent.contentOffset.x;
+					}}
+				>
+					<View
+						ref={columnsRowRef}
+						style={styles.columnsRow}
+						onLayout={() => {
+							columnsRowRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
+								containerOffset.current = { x: pageX, y: pageY };
+							});
+						}}
+					>
+						{showOverflow && renderColumn("overflow")}
+						{activePlaces.map((place) => renderColumn(place))}
+					</View>
+				</ScrollView>
+			</GestureDetector>
 
 			<View style={styles.banner}>
 				<Text
@@ -290,6 +333,13 @@ const styles = StyleSheet.create({
 	container: {
 		alignItems: "center",
 		gap: spacing.md,
+	},
+	// alignSelf stretch overrides parent's alignItems:"center" so the scroll view
+	// takes the full container width instead of sizing to its content width.
+	// flexGrow:0 prevents it from expanding to fill remaining vertical space.
+	columnsScroll: {
+		alignSelf: "stretch",
+		flexGrow: 0,
 	},
 	columnsRow: {
 		flexDirection: "row",
