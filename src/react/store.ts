@@ -8,6 +8,19 @@ import {
 	generateAdditionProblem,
 } from "@domain/addition";
 import { type Attempt, createAttempt } from "@domain/attempt";
+import {
+	type FinalSumWork,
+	type MultiplicationDifficulty,
+	type MultiplicationProblem,
+	type MultiplicationSolution,
+	type PartialProductRow,
+	computeMultiplicationSolution,
+	enterFinalAdditionCarry,
+	enterFinalSumDigit,
+	enterFinalSumOverflow,
+	generateMultiplicationProblem,
+	initialFinalSumWork,
+} from "@domain/multiplication";
 import type { StoragePort } from "@domain/ports";
 import {
 	type SubtractionDifficulty,
@@ -67,6 +80,12 @@ type SubtractionWorkState = {
 	solved: boolean;
 };
 
+type MultiplicationWorkState = {
+	rows: WorkState[]; // one per multiplier digit (index 0 = ones digit)
+	activeRow: number;
+	solved: boolean;
+};
+
 type State = {
 	problem: AdditionProblem;
 	difficulty: AdditionDifficulty;
@@ -76,12 +95,17 @@ type State = {
 	mode: Mode;
 	attempts: Attempt[];
 	periodStart: number;
-	operation: "addition" | "subtraction";
+	operation: "addition" | "subtraction" | "multiplication";
 	subtractionDifficulty: SubtractionDifficulty;
 	subtractionProblem: SubtractionProblem;
 	subtractionSolution: SubtractionSolution;
 	subtractionWork: SubtractionWorkState;
 	visualSubWork: VisualSubWorkState;
+	multiplicationDifficulty: MultiplicationDifficulty;
+	multiplicationProblem: MultiplicationProblem;
+	multiplicationSolution: MultiplicationSolution;
+	multiplicationWork: MultiplicationWorkState;
+	finalSumWork: FinalSumWork;
 	toolboxOpen: boolean;
 };
 
@@ -95,8 +119,9 @@ type Actions = {
 	setMode: (mode: Mode) => void;
 	moveVisualDisk: (place: Place, from: VisualZone) => void;
 	carryVisual: (place: Place, zone: VisualZone) => void;
-	setOperation: (op: "addition" | "subtraction") => void;
+	setOperation: (op: "addition" | "subtraction" | "multiplication") => void;
 	setSubtractionDifficulty: (difficulty: SubtractionDifficulty) => void;
+	setMultiplicationDifficulty: (difficulty: MultiplicationDifficulty) => void;
 	setToolboxOpen: (open: boolean) => void;
 	enterSubtractionAnswer: (place: Place, digit: string) => void;
 	enterSubtractionBorrow: (place: Place, digit: string) => void;
@@ -104,12 +129,22 @@ type Actions = {
 	cancelVisualSub: (place: Place) => void;
 	moveBorrowDownVisualSub: (place: Place) => void;
 	borrowVisualSub: (fromPlace: Place) => void;
+	enterMultiplicationAnswer: (place: Place, digit: string) => void;
+	enterMultiplicationCarry: (place: Place, digit: string) => void;
+	enterMultiplicationFinalCarry: (digit: string) => void;
+	enterMultiplicationFinalSum: (place: Place, digit: string) => void;
+	enterMultiplicationFinalAdditionCarry: (place: Place, digit: string) => void;
+	enterMultiplicationFinalSumOverflow: (digit: string) => void;
 };
 
 const DEFAULT_DIFFICULTY: AdditionDifficulty = { numPlaces: 3, numCarries: 2 };
 const DEFAULT_SUBTRACTION_DIFFICULTY: SubtractionDifficulty = {
 	numPlaces: 3,
 	numBorrows: 2,
+};
+const DEFAULT_MULTIPLICATION_DIFFICULTY: MultiplicationDifficulty = {
+	numPlaces: 2,
+	multiplierPlaces: 1,
 };
 
 let _storage: StoragePort = new InMemoryStorage();
@@ -125,6 +160,7 @@ export function initializeStorage(storage: StoragePort): void {
 
 	const savedDifficulty = storage.getDifficulty();
 	const savedSubtractionDifficulty = storage.getSubtractionDifficulty();
+	const savedMultiplicationDifficulty = storage.getMultiplicationDifficulty();
 	const attempts = storage.getAttempts();
 	const savedPeriodStart = storage.getPeriodStart();
 	const periodStart =
@@ -151,6 +187,22 @@ export function initializeStorage(storage: StoragePort): void {
 		nextState.subtractionSolution = computeSubtractionSolution(subProb);
 		nextState.subtractionWork = initialSubtractionWork();
 		nextState.visualSubWork = initialVisualSubWork(subProb);
+	}
+
+	if (
+		savedMultiplicationDifficulty &&
+		"multiplierPlaces" in savedMultiplicationDifficulty
+	) {
+		const mulProb = generateMultiplicationProblem(
+			savedMultiplicationDifficulty,
+		);
+		nextState.multiplicationDifficulty = savedMultiplicationDifficulty;
+		nextState.multiplicationProblem = mulProb;
+		nextState.multiplicationSolution = computeMultiplicationSolution(mulProb);
+		nextState.multiplicationWork = initialMultiplicationWork(
+			savedMultiplicationDifficulty.multiplierPlaces,
+		);
+		nextState.finalSumWork = initialFinalSumWorkForProblem(mulProb);
 	}
 
 	useAdditionStore.setState(nextState);
@@ -204,6 +256,23 @@ function initialSubtractionWork(): SubtractionWorkState {
 	};
 }
 
+function initialMultiplicationWork(
+	multiplierPlaces: number,
+): MultiplicationWorkState {
+	return {
+		rows: Array.from({ length: multiplierPlaces }, () => initialWork()),
+		activeRow: 0,
+		solved: false,
+	};
+}
+
+function initialFinalSumWorkForProblem(
+	problem: MultiplicationProblem,
+): FinalSumWork {
+	const displayWidth = problem.numPlaces + problem.multiplierPlaces - 1;
+	return initialFinalSumWork(displayWidth);
+}
+
 function advanceIfComplete(
 	index: number,
 	updatedEntries: Record<Place, PlaceWorkEntry>,
@@ -235,6 +304,37 @@ function advanceIfComplete(
 		return { solved: true };
 	}
 	return { unlockedUpTo: numPlaces }; // unlock final carry-out column
+}
+
+function multiplicationAdvanceIfComplete(
+	index: number,
+	updatedEntries: Record<Place, PlaceWorkEntry>,
+	work: WorkState,
+	row: PartialProductRow,
+	numPlaces: number,
+): Partial<WorkState> {
+	const place = PLACES[index];
+	const entry = updatedEntries[place];
+	const col = row.columns[place];
+
+	const answerCorrect = entry.answerStatus === "correct";
+	const isLeading = index === numPlaces - 1;
+	const carryCorrect =
+		isLeading || col.carryOut === 0 || entry.carryStatus === "correct";
+	const columnComplete = answerCorrect && carryCorrect;
+
+	if (!columnComplete || index !== work.unlockedUpTo) {
+		return {};
+	}
+
+	const nextIndex = index + 1;
+	if (nextIndex < numPlaces) {
+		return { unlockedUpTo: nextIndex };
+	}
+	if (row.finalCarryOut === 0) {
+		return { solved: true };
+	}
+	return { unlockedUpTo: numPlaces };
 }
 
 function subtractionAdvanceIfComplete(
@@ -287,6 +387,9 @@ const initialSubtractionProblem = generateSubtractionProblem(
 const initialVisualSubWorkState = initialVisualSubWork(
 	initialSubtractionProblem,
 );
+const initialMultiplicationProblem = generateMultiplicationProblem(
+	DEFAULT_MULTIPLICATION_DIFFICULTY,
+);
 
 export const useAdditionStore = create<State & Actions>()((set, get) => ({
 	difficulty: DEFAULT_DIFFICULTY,
@@ -297,12 +400,21 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 	mode: "visual" as Mode,
 	attempts: [],
 	periodStart: midnightToday(),
-	operation: "addition" as "addition" | "subtraction",
+	operation: "addition" as "addition" | "subtraction" | "multiplication",
 	subtractionDifficulty: DEFAULT_SUBTRACTION_DIFFICULTY,
 	subtractionProblem: initialSubtractionProblem,
 	subtractionSolution: computeSubtractionSolution(initialSubtractionProblem),
 	subtractionWork: initialSubtractionWork(),
 	visualSubWork: initialVisualSubWorkState,
+	multiplicationDifficulty: DEFAULT_MULTIPLICATION_DIFFICULTY,
+	multiplicationProblem: initialMultiplicationProblem,
+	multiplicationSolution: computeMultiplicationSolution(
+		initialMultiplicationProblem,
+	),
+	multiplicationWork: initialMultiplicationWork(
+		DEFAULT_MULTIPLICATION_DIFFICULTY.multiplierPlaces,
+	),
+	finalSumWork: initialFinalSumWorkForProblem(initialMultiplicationProblem),
 	toolboxOpen: false,
 
 	newProblem: () => {
@@ -316,6 +428,9 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			subtractionProblem,
 			difficulty,
 			subtractionDifficulty,
+			multiplicationWork,
+			multiplicationProblem,
+			multiplicationDifficulty,
 			mode,
 		} = get();
 
@@ -331,6 +446,19 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 				subtractionSolution: computeSubtractionSolution(newProb),
 				subtractionWork: initialSubtractionWork(),
 				visualSubWork: initialVisualSubWork(newProb),
+			});
+		} else if (operation === "multiplication") {
+			if (!multiplicationWork.solved) {
+				recordAttemptInternal(multiplicationProblem.numPlaces, false);
+			}
+			const newProb = generateMultiplicationProblem(multiplicationDifficulty);
+			set({
+				multiplicationProblem: newProb,
+				multiplicationSolution: computeMultiplicationSolution(newProb),
+				multiplicationWork: initialMultiplicationWork(
+					multiplicationDifficulty.multiplierPlaces,
+				),
+				finalSumWork: initialFinalSumWorkForProblem(newProb),
 			});
 		} else {
 			const activeModeSolved =
@@ -490,7 +618,7 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 		set({ visualWork: newWork });
 	},
 
-	setOperation: (op: "addition" | "subtraction") => {
+	setOperation: (op: "addition" | "subtraction" | "multiplication") => {
 		const {
 			operation,
 			work,
@@ -499,6 +627,8 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			subtractionWork,
 			visualSubWork,
 			subtractionProblem,
+			multiplicationWork,
+			multiplicationProblem,
 			mode,
 		} = get();
 		if (operation === op) return;
@@ -509,11 +639,16 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			if (!activeModeSolved) {
 				recordAttemptInternal(problem.numPlaces, false);
 			}
-		} else {
+		} else if (operation === "subtraction") {
 			const subActiveSolved =
 				mode === "visual" ? visualSubWork.solved : subtractionWork.solved;
 			if (!subActiveSolved) {
 				recordAttemptInternal(subtractionProblem.numPlaces, false);
+			}
+		} else {
+			// multiplication
+			if (!multiplicationWork.solved) {
+				recordAttemptInternal(multiplicationProblem.numPlaces, false);
 			}
 		}
 
@@ -543,6 +678,24 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			subtractionSolution: computeSubtractionSolution(newProb),
 			subtractionWork: initialSubtractionWork(),
 			visualSubWork: initialVisualSubWork(newProb),
+		});
+	},
+
+	setMultiplicationDifficulty: (difficulty: MultiplicationDifficulty) => {
+		const { multiplicationWork, multiplicationProblem } = get();
+		if (!multiplicationWork.solved) {
+			recordAttemptInternal(multiplicationProblem.numPlaces, false);
+		}
+		_storage.saveMultiplicationDifficulty(difficulty);
+		const newProb = generateMultiplicationProblem(difficulty);
+		set({
+			multiplicationDifficulty: difficulty,
+			multiplicationProblem: newProb,
+			multiplicationSolution: computeMultiplicationSolution(newProb),
+			multiplicationWork: initialMultiplicationWork(
+				difficulty.multiplierPlaces,
+			),
+			finalSumWork: initialFinalSumWorkForProblem(newProb),
 		});
 	},
 
@@ -703,5 +856,236 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			recordAttemptInternal(subtractionProblem.numPlaces, true);
 		}
 		set({ visualSubWork: newWork });
+	},
+
+	enterMultiplicationAnswer: (place: Place, digit: string) => {
+		const {
+			multiplicationSolution,
+			multiplicationWork,
+			multiplicationProblem,
+		} = get();
+		const { rows, activeRow } = multiplicationWork;
+		const currentRow = rows[activeRow];
+		const index = PLACES.indexOf(place);
+		if (index > currentRow.unlockedUpTo) return;
+
+		const col =
+			multiplicationSolution.partialProducts[activeRow].columns[place];
+		const correct = digit === String(col.answerDigit);
+		const answerStatus: CellStatus = correct ? "correct" : "incorrect";
+
+		const updatedEntries: Record<Place, PlaceWorkEntry> = {
+			...currentRow.entries,
+			[place]: {
+				...currentRow.entries[place],
+				answer: digit,
+				answerStatus,
+			},
+		};
+
+		const advance = multiplicationAdvanceIfComplete(
+			index,
+			updatedEntries,
+			currentRow,
+			multiplicationSolution.partialProducts[activeRow],
+			multiplicationProblem.numPlaces,
+		);
+
+		let newActiveRow = activeRow;
+
+		if (advance.solved === true) {
+			if (activeRow + 1 < multiplicationProblem.multiplierPlaces) {
+				newActiveRow = activeRow + 1;
+			}
+			// else: partial products done — finalSumWork handles overall solved
+		}
+
+		const updatedRows = rows.map((row, i) =>
+			i === activeRow
+				? { ...currentRow, entries: updatedEntries, ...advance }
+				: row,
+		);
+
+		set({
+			multiplicationWork: {
+				...multiplicationWork,
+				rows: updatedRows,
+				activeRow: newActiveRow,
+			},
+		});
+	},
+
+	enterMultiplicationCarry: (place: Place, digit: string) => {
+		const {
+			multiplicationSolution,
+			multiplicationWork,
+			multiplicationProblem,
+		} = get();
+		const { rows, activeRow } = multiplicationWork;
+		const currentRow = rows[activeRow];
+		const index = PLACES.indexOf(place);
+
+		const col =
+			multiplicationSolution.partialProducts[activeRow].columns[place];
+		const correct = digit === String(col.carryOut);
+		const carryStatus: CellStatus = correct ? "correct" : "incorrect";
+
+		const updatedEntries: Record<Place, PlaceWorkEntry> = {
+			...currentRow.entries,
+			[place]: {
+				...currentRow.entries[place],
+				carry: digit,
+				carryStatus,
+			},
+		};
+
+		const advance = multiplicationAdvanceIfComplete(
+			index,
+			updatedEntries,
+			currentRow,
+			multiplicationSolution.partialProducts[activeRow],
+			multiplicationProblem.numPlaces,
+		);
+
+		let newActiveRow = activeRow;
+
+		if (advance.solved === true) {
+			if (activeRow + 1 < multiplicationProblem.multiplierPlaces) {
+				newActiveRow = activeRow + 1;
+			}
+			// else: partial products done — finalSumWork handles overall solved
+		}
+
+		const updatedRows = rows.map((row, i) =>
+			i === activeRow
+				? { ...currentRow, entries: updatedEntries, ...advance }
+				: row,
+		);
+
+		set({
+			multiplicationWork: {
+				...multiplicationWork,
+				rows: updatedRows,
+				activeRow: newActiveRow,
+			},
+		});
+	},
+
+	enterMultiplicationFinalCarry: (digit: string) => {
+		const {
+			multiplicationSolution,
+			multiplicationWork,
+			multiplicationProblem,
+		} = get();
+		const { rows, activeRow } = multiplicationWork;
+		const currentRow = rows[activeRow];
+		const correct =
+			digit ===
+			String(multiplicationSolution.partialProducts[activeRow].finalCarryOut);
+		const finalCarryStatus: CellStatus = correct ? "correct" : "incorrect";
+
+		const updatedCurrentRow: WorkState = {
+			...currentRow,
+			finalCarry: digit,
+			finalCarryStatus,
+			solved: correct,
+		};
+
+		let newActiveRow = activeRow;
+
+		if (correct) {
+			if (activeRow + 1 < multiplicationProblem.multiplierPlaces) {
+				newActiveRow = activeRow + 1;
+			}
+			// else: partial products done — finalSumWork handles overall solved
+		}
+
+		const updatedRows = rows.map((row, i) =>
+			i === activeRow ? updatedCurrentRow : row,
+		);
+
+		set({
+			multiplicationWork: {
+				...multiplicationWork,
+				rows: updatedRows,
+				activeRow: newActiveRow,
+			},
+		});
+	},
+
+	enterMultiplicationFinalSum: (place: Place, digit: string) => {
+		const {
+			multiplicationSolution,
+			multiplicationWork,
+			multiplicationProblem,
+			finalSumWork,
+		} = get();
+		const displayWidth =
+			multiplicationProblem.numPlaces +
+			multiplicationProblem.multiplierPlaces -
+			1;
+		const newFinalSumWork = enterFinalSumDigit(
+			finalSumWork,
+			multiplicationSolution,
+			place,
+			digit,
+			displayWidth,
+		);
+		const partialProductsSolved = multiplicationWork.rows.every(
+			(r) => r.solved,
+		);
+		const overallSolved = partialProductsSolved && newFinalSumWork.solved;
+
+		if (overallSolved && !multiplicationWork.solved) {
+			recordAttemptInternal(multiplicationProblem.numPlaces, true);
+		}
+
+		set({
+			finalSumWork: newFinalSumWork,
+			multiplicationWork: { ...multiplicationWork, solved: overallSolved },
+		});
+	},
+
+	enterMultiplicationFinalAdditionCarry: (place: Place, digit: string) => {
+		const { multiplicationSolution, multiplicationWork, finalSumWork } = get();
+		const partialProductsSolved = multiplicationWork.rows.every(
+			(r) => r.solved,
+		);
+		if (!partialProductsSolved) return;
+		const displayWidth = Object.keys(finalSumWork.entries).length;
+		const newFinalSumWork = enterFinalAdditionCarry(
+			finalSumWork,
+			multiplicationSolution,
+			place,
+			digit,
+			displayWidth,
+		);
+		set({ finalSumWork: newFinalSumWork });
+	},
+
+	enterMultiplicationFinalSumOverflow: (digit: string) => {
+		const {
+			multiplicationSolution,
+			multiplicationWork,
+			multiplicationProblem,
+			finalSumWork,
+		} = get();
+		const partialProductsSolved = multiplicationWork.rows.every(
+			(r) => r.solved,
+		);
+		if (!partialProductsSolved) return;
+		const newFinalSumWork = enterFinalSumOverflow(
+			finalSumWork,
+			multiplicationSolution,
+			digit,
+		);
+		const overallSolved = partialProductsSolved && newFinalSumWork.solved;
+		if (overallSolved && !multiplicationWork.solved) {
+			recordAttemptInternal(multiplicationProblem.numPlaces, true);
+		}
+		set({
+			finalSumWork: newFinalSumWork,
+			multiplicationWork: { ...multiplicationWork, solved: overallSolved },
+		});
 	},
 }));

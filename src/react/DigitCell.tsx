@@ -10,6 +10,7 @@ type DigitCellProps =
 			value: string;
 			status: CellStatus;
 			locked?: boolean;
+			attention?: boolean;
 			maxLength?: number;
 			onChangeText: (t: string) => void;
 			testID?: string;
@@ -39,6 +40,7 @@ export function DigitCell(props: DigitCellProps) {
 		value,
 		status,
 		locked = false,
+		attention = false,
 		maxLength: maxLen = 1,
 		onChangeText,
 		testID,
@@ -54,7 +56,9 @@ export function DigitCell(props: DigitCellProps) {
 				? styles.correctCell
 				: status === "incorrect"
 					? styles.incorrectCell
-					: styles.idleCell,
+					: attention
+						? styles.attentionCell
+						: styles.idleCell,
 	];
 
 	return (
@@ -81,7 +85,9 @@ export function DigitCell(props: DigitCellProps) {
 							? styles.correctText
 							: status === "incorrect"
 								? styles.incorrectText
-								: styles.idleText,
+								: attention
+									? styles.attentionText
+									: styles.idleText,
 				]}
 			/>
 		</View>
@@ -120,6 +126,10 @@ const styles = StyleSheet.create({
 		borderColor: colors.error,
 		backgroundColor: colors.errorSurface,
 	},
+	attentionCell: {
+		borderColor: colors.warning,
+		backgroundColor: colors.warningSurface,
+	},
 	lockedCell: {
 		borderWidth: 1,
 		borderColor: colors.border,
@@ -132,6 +142,7 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		width: "100%",
 		height: "100%",
+		padding: 0,
 	},
 	inputSmall: {
 		fontSize: typography.fontSize.lg,
@@ -140,6 +151,7 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		width: "100%",
 		height: "100%",
+		padding: 0,
 	},
 	idleText: {
 		color: colors.text,
@@ -150,7 +162,10 @@ const styles = StyleSheet.create({
 	incorrectText: {
 		color: colors.error,
 	},
+	attentionText: {
+		color: colors.warning,
+	},
 	lockedText: {
-		color: colors.textMuted,
+		color: colors.text,
 	},
 });
