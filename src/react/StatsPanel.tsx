@@ -4,8 +4,8 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 type Period = "all" | "today";
-type ModeFilter = "all" | "digit" | "visual";
-type OpFilter = "all" | "addition" | "subtraction";
+type ModeFilter = "all" | "digit" | "visual" | "lattice";
+type OpFilter = "all" | "addition" | "subtraction" | "multiplication";
 
 const DIGIT_LABELS: Record<1 | 2 | 3 | 4, string> = {
 	1: "1 digit",
@@ -73,7 +73,8 @@ export function StatsPanel() {
 			</View>
 
 			<View style={styles.toggleRow}>
-				{(["all", "addition", "subtraction"] as const).map((op) => (
+				{(["all", "addition", "subtraction", "multiplication"] as const).map(
+					(op) => (
 					<Pressable
 						key={op}
 						style={[
@@ -88,14 +89,21 @@ export function StatsPanel() {
 								opFilter === op && styles.toggleTextActive,
 							]}
 						>
-							{op === "all" ? "All Ops" : op === "addition" ? "+" : "−"}
+							{op === "all"
+								? "All Ops"
+								: op === "addition"
+									? "+"
+									: op === "subtraction"
+										? "−"
+										: "×"}
 						</Text>
 					</Pressable>
-				))}
+					),
+				)}
 			</View>
 
 			<View style={styles.toggleRow}>
-				{(["all", "digit", "visual"] as const).map((m) => (
+				{(["all", "digit", "visual", "lattice"] as const).map((m) => (
 					<Pressable
 						key={m}
 						style={[
@@ -110,7 +118,13 @@ export function StatsPanel() {
 								modeFilter === m && styles.toggleTextActive,
 							]}
 						>
-							{m === "all" ? "All Modes" : m === "digit" ? "Digit" : "Visual"}
+							{m === "all"
+								? "All Modes"
+								: m === "digit"
+									? "Digit"
+									: m === "visual"
+										? "Visual"
+										: "Lattice"}
 						</Text>
 					</Pressable>
 				))}

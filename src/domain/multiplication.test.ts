@@ -4,11 +4,14 @@ import {
 	type MultiplicationDifficulty,
 	type MultiplicationProblem,
 	computeMultiplicationSolution,
+	enterLatticeCellDigit,
+	enterLatticeDiagonalDigit,
 	enterFinalAdditionCarry,
 	enterFinalSumDigit,
 	enterFinalSumOverflow,
 	generateMultiplicationProblem,
 	initialFinalSumWork,
+	initialLatticeWork,
 } from "@domain/multiplication";
 
 describe("computeMultiplicationSolution - partial products", () => {
@@ -238,6 +241,121 @@ describe("computeMultiplicationSolution - digit products", () => {
 				tensDigit: 4,
 			}),
 		]);
+	});
+});
+
+describe("computeMultiplicationSolution - lattice", () => {
+	test("12 × 34 exposes lattice cells in display order", () => {
+		const problem: MultiplicationProblem = {
+			multiplicand: { ones_pl: 2, tens_pl: 1, hundreds_pl: 0, thousands_pl: 0 },
+			multiplier: 34,
+			numPlaces: 2,
+			multiplierPlaces: 2,
+		};
+		const sol = computeMultiplicationSolution(problem);
+
+		expect(sol.lattice.cells[0][0]).toEqual(
+			expect.objectContaining({
+				multiplicandDigit: 1,
+				multiplierDigit: 3,
+				product: 3,
+				tensDigit: 0,
+				onesDigit: 3,
+				tensDiagonal: 3,
+				onesDiagonal: 2,
+			}),
+		);
+		expect(sol.lattice.cells[1][1]).toEqual(
+			expect.objectContaining({
+				multiplicandDigit: 2,
+				multiplierDigit: 4,
+				product: 8,
+				tensDigit: 0,
+				onesDigit: 8,
+				tensDiagonal: 1,
+				onesDiagonal: 0,
+			}),
+		);
+	});
+
+	test("99 × 99 lattice diagonals reconstruct 9801", () => {
+		const problem: MultiplicationProblem = {
+			multiplicand: { ones_pl: 9, tens_pl: 9, hundreds_pl: 0, thousands_pl: 0 },
+			multiplier: 99,
+			numPlaces: 2,
+			multiplierPlaces: 2,
+		};
+		const sol = computeMultiplicationSolution(problem);
+
+		expect(sol.lattice.diagonals.map((diagonal) => diagonal.resultDigit)).toEqual([
+			1, 0, 8, 9,
+		]);
+		expect(sol.lattice.diagonals[1]).toEqual(
+			expect.objectContaining({
+				carryIn: 0,
+				sum: 10,
+				resultDigit: 0,
+				carryOut: 1,
+			}),
+		);
+	});
+});
+
+describe("lattice work", () => {
+	const problem: MultiplicationProblem = {
+		multiplicand: { ones_pl: 2, tens_pl: 1, hundreds_pl: 0, thousands_pl: 0 },
+		multiplier: 34,
+		numPlaces: 2,
+		multiplierPlaces: 2,
+	};
+	const solution = computeMultiplicationSolution(problem);
+
+	test("cell products accept free-order entry", () => {
+		const work = initialLatticeWork(problem);
+		const next = enterLatticeCellDigit(work, solution, 1, 1, "ones", "8");
+		expect(next.cells[1][1].ones.status).toBe("correct");
+		expect(next.solved).toBe(false);
+	});
+
+	test("diagonal digits accept free-order entry", () => {
+		const work = initialLatticeWork(problem);
+		const next = enterLatticeDiagonalDigit(work, solution, 2, "4");
+		expect(next.diagonals[2]).toEqual({ answer: "4", status: "correct" });
+		expect(next.solved).toBe(false);
+	});
+
+	test("solved becomes true once all cell halves and diagonal digits are correct", () => {
+		let work = initialLatticeWork(problem);
+		for (let row = 0; row < solution.lattice.cells.length; row++) {
+			for (let col = 0; col < solution.lattice.cells[row].length; col++) {
+				const cell = solution.lattice.cells[row][col];
+				work = enterLatticeCellDigit(
+					work,
+					solution,
+					row,
+					col,
+					"tens",
+					String(cell.tensDigit),
+				);
+				work = enterLatticeCellDigit(
+					work,
+					solution,
+					row,
+					col,
+					"ones",
+					String(cell.onesDigit),
+				);
+			}
+		}
+		for (const diagonal of solution.lattice.diagonals) {
+			work = enterLatticeDiagonalDigit(
+				work,
+				solution,
+				diagonal.index,
+				String(diagonal.resultDigit),
+			);
+		}
+		expect(work.solved).toBe(true);
 	});
 });
 

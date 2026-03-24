@@ -1,5 +1,7 @@
 [data-testid="addition-problem-solver"] input,
-[data-testid="subtraction-problem-solver"] input {
+[data-testid="subtraction-problem-solver"] input,
+[data-testid="multiplication-problem-solver"] input,
+[data-testid="multiplication-lattice-solver"] input {
 	padding: 0;
 	border: none;
 	height: auto;
@@ -8,5 +10,6 @@
 	box-shadow: none;
 	outline: none;
 	margin: 0;
-	appearance: auto;
+	line-height: 1;
+	appearance: none;
 }

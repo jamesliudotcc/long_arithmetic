@@ -10,16 +10,20 @@ import {
 import { type Attempt, createAttempt } from "@domain/attempt";
 import {
 	type FinalSumWork,
+	type LatticeWorkState,
 	type MultiplicationDifficulty,
 	type MultiplicationProblem,
 	type MultiplicationSolution,
 	type PartialProductRow,
 	computeMultiplicationSolution,
+	enterLatticeCellDigit,
+	enterLatticeDiagonalDigit,
 	enterFinalAdditionCarry,
 	enterFinalSumDigit,
 	enterFinalSumOverflow,
 	generateMultiplicationProblem,
 	initialFinalSumWork,
+	initialLatticeWork,
 } from "@domain/multiplication";
 import type { StoragePort } from "@domain/ports";
 import {
@@ -49,6 +53,7 @@ import { create } from "zustand";
 export type CellStatus = "idle" | "correct" | "incorrect";
 
 export type Mode = "digit" | "visual";
+export type MultiplicationMode = "digit" | "lattice";
 
 type PlaceWorkEntry = {
 	answer: string; // "" | "0"–"9"
@@ -93,6 +98,7 @@ type State = {
 	work: WorkState;
 	visualWork: VisualWorkState;
 	mode: Mode;
+	multiplicationMode: MultiplicationMode;
 	attempts: Attempt[];
 	periodStart: number;
 	operation: "addition" | "subtraction" | "multiplication";
@@ -105,6 +111,7 @@ type State = {
 	multiplicationProblem: MultiplicationProblem;
 	multiplicationSolution: MultiplicationSolution;
 	multiplicationWork: MultiplicationWorkState;
+	latticeWork: LatticeWorkState;
 	finalSumWork: FinalSumWork;
 	toolboxOpen: boolean;
 };
@@ -117,6 +124,7 @@ type Actions = {
 	enterFinalCarry: (digit: string) => void;
 	resetPeriod: () => void;
 	setMode: (mode: Mode) => void;
+	setMultiplicationMode: (mode: MultiplicationMode) => void;
 	moveVisualDisk: (place: Place, from: VisualZone) => void;
 	carryVisual: (place: Place, zone: VisualZone) => void;
 	setOperation: (op: "addition" | "subtraction" | "multiplication") => void;
@@ -135,6 +143,13 @@ type Actions = {
 	enterMultiplicationFinalSum: (place: Place, digit: string) => void;
 	enterMultiplicationFinalAdditionCarry: (place: Place, digit: string) => void;
 	enterMultiplicationFinalSumOverflow: (digit: string) => void;
+	enterLatticeCell: (
+		row: number,
+		col: number,
+		half: "tens" | "ones",
+		digit: string,
+	) => void;
+	enterLatticeDiagonal: (index: number, digit: string) => void;
 };
 
 const DEFAULT_DIFFICULTY: AdditionDifficulty = { numPlaces: 3, numCarries: 2 };
@@ -202,6 +217,7 @@ export function initializeStorage(storage: StoragePort): void {
 		nextState.multiplicationWork = initialMultiplicationWork(
 			savedMultiplicationDifficulty.multiplierPlaces,
 		);
+		nextState.latticeWork = initialLatticeWork(mulProb);
 		nextState.finalSumWork = initialFinalSumWorkForProblem(mulProb);
 	}
 
@@ -374,8 +390,9 @@ function recordAttemptInternal(
 	numPlaces: 1 | 2 | 3 | 4,
 	correct: boolean,
 ): void {
-	const { mode, operation } = useAdditionStore.getState();
-	const attempt = createAttempt(numPlaces, correct, mode, operation);
+	const { mode, multiplicationMode, operation } = useAdditionStore.getState();
+	const attemptMode = operation === "multiplication" ? multiplicationMode : mode;
+	const attempt = createAttempt(numPlaces, correct, attemptMode, operation);
 	_storage.saveAttempt(attempt);
 	useAdditionStore.setState((s) => ({ attempts: [...s.attempts, attempt] }));
 }
@@ -398,6 +415,7 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 	work: initialWork(),
 	visualWork: initialVisualWork(initialProblem),
 	mode: "visual" as Mode,
+	multiplicationMode: "digit" as MultiplicationMode,
 	attempts: [],
 	periodStart: midnightToday(),
 	operation: "addition" as "addition" | "subtraction" | "multiplication",
@@ -414,6 +432,7 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 	multiplicationWork: initialMultiplicationWork(
 		DEFAULT_MULTIPLICATION_DIFFICULTY.multiplierPlaces,
 	),
+	latticeWork: initialLatticeWork(initialMultiplicationProblem),
 	finalSumWork: initialFinalSumWorkForProblem(initialMultiplicationProblem),
 	toolboxOpen: false,
 
@@ -432,6 +451,8 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			multiplicationProblem,
 			multiplicationDifficulty,
 			mode,
+			multiplicationMode,
+			latticeWork,
 		} = get();
 
 		if (operation === "subtraction") {
@@ -448,7 +469,11 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 				visualSubWork: initialVisualSubWork(newProb),
 			});
 		} else if (operation === "multiplication") {
-			if (!multiplicationWork.solved) {
+			const multiplicationSolved =
+				multiplicationMode === "lattice"
+					? latticeWork.solved
+					: multiplicationWork.solved;
+			if (!multiplicationSolved) {
 				recordAttemptInternal(multiplicationProblem.numPlaces, false);
 			}
 			const newProb = generateMultiplicationProblem(multiplicationDifficulty);
@@ -458,6 +483,7 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 				multiplicationWork: initialMultiplicationWork(
 					multiplicationDifficulty.multiplierPlaces,
 				),
+				latticeWork: initialLatticeWork(newProb),
 				finalSumWork: initialFinalSumWorkForProblem(newProb),
 			});
 		} else {
@@ -596,6 +622,10 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 		set({ mode });
 	},
 
+	setMultiplicationMode: (multiplicationMode: MultiplicationMode) => {
+		set({ multiplicationMode });
+	},
+
 	setToolboxOpen: (open: boolean) => {
 		set({ toolboxOpen: open });
 	},
@@ -630,6 +660,8 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			multiplicationWork,
 			multiplicationProblem,
 			mode,
+			multiplicationMode,
+			latticeWork,
 		} = get();
 		if (operation === op) return;
 
@@ -647,7 +679,11 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			}
 		} else {
 			// multiplication
-			if (!multiplicationWork.solved) {
+			const multiplicationSolved =
+				multiplicationMode === "lattice"
+					? latticeWork.solved
+					: multiplicationWork.solved;
+			if (!multiplicationSolved) {
 				recordAttemptInternal(multiplicationProblem.numPlaces, false);
 			}
 		}
@@ -682,8 +718,17 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 	},
 
 	setMultiplicationDifficulty: (difficulty: MultiplicationDifficulty) => {
-		const { multiplicationWork, multiplicationProblem } = get();
-		if (!multiplicationWork.solved) {
+		const {
+			multiplicationWork,
+			multiplicationProblem,
+			multiplicationMode,
+			latticeWork,
+		} = get();
+		const multiplicationSolved =
+			multiplicationMode === "lattice"
+				? latticeWork.solved
+				: multiplicationWork.solved;
+		if (!multiplicationSolved) {
 			recordAttemptInternal(multiplicationProblem.numPlaces, false);
 		}
 		_storage.saveMultiplicationDifficulty(difficulty);
@@ -695,6 +740,7 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			multiplicationWork: initialMultiplicationWork(
 				difficulty.multiplierPlaces,
 			),
+			latticeWork: initialLatticeWork(newProb),
 			finalSumWork: initialFinalSumWorkForProblem(newProb),
 		});
 	},
@@ -1087,5 +1133,40 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			finalSumWork: newFinalSumWork,
 			multiplicationWork: { ...multiplicationWork, solved: overallSolved },
 		});
+	},
+
+	enterLatticeCell: (
+		row: number,
+		col: number,
+		half: "tens" | "ones",
+		digit: string,
+	) => {
+		const { latticeWork, multiplicationSolution, multiplicationProblem } = get();
+		const nextWork = enterLatticeCellDigit(
+			latticeWork,
+			multiplicationSolution,
+			row,
+			col,
+			half,
+			digit,
+		);
+		if (nextWork.solved && !latticeWork.solved) {
+			recordAttemptInternal(multiplicationProblem.numPlaces, true);
+		}
+		set({ latticeWork: nextWork });
+	},
+
+	enterLatticeDiagonal: (index: number, digit: string) => {
+		const { latticeWork, multiplicationSolution, multiplicationProblem } = get();
+		const nextWork = enterLatticeDiagonalDigit(
+			latticeWork,
+			multiplicationSolution,
+			index,
+			digit,
+		);
+		if (nextWork.solved && !latticeWork.solved) {
+			recordAttemptInternal(multiplicationProblem.numPlaces, true);
+		}
+		set({ latticeWork: nextWork });
 	},
 }));

@@ -27,6 +27,8 @@ export const colors = {
 	errorSurface: "#fdecea",
 	success: "#198754",
 	successSurface: "#eaf5ee",
+	warning: "#b45309",
+	warningSurface: "#fef3c7",
 } as const;
 
 export const spacing = {

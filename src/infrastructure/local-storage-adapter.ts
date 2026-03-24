@@ -1,43 +1,55 @@
 import type { AdditionDifficulty } from "@domain/addition";
 import type { Attempt } from "@domain/attempt";
+import type { MultiplicationDifficulty } from "@domain/multiplication";
 import type { StoragePort } from "@domain/ports";
 import type { SubtractionDifficulty } from "@domain/subtraction";
 
 const KEY_DIFFICULTY = "long-arithmetic:difficulty";
 const KEY_SUBTRACTION_DIFFICULTY = "long-arithmetic:subtraction_difficulty";
+const KEY_MULTIPLICATION_DIFFICULTY =
+	"long-arithmetic:multiplication_difficulty";
 const KEY_ATTEMPTS = "long-arithmetic:attempts";
 const KEY_PERIOD_START = "long-arithmetic:periodStart";
 
 export class LocalStorageAdapter implements StoragePort {
-	getDifficulty(): AdditionDifficulty | null {
+	private getItem<T>(key: string): T | null {
 		try {
-			const raw = localStorage.getItem(KEY_DIFFICULTY);
+			const raw = localStorage.getItem(key);
 			if (raw === null) return null;
-			return JSON.parse(raw) as AdditionDifficulty;
+			return JSON.parse(raw) as T;
 		} catch {
 			return null;
 		}
+	}
+
+	private setItem<T>(key: string, value: T): void {
+		localStorage.setItem(key, JSON.stringify(value));
+	}
+
+	getDifficulty(): AdditionDifficulty | null {
+		return this.getItem<AdditionDifficulty>(KEY_DIFFICULTY);
 	}
 
 	saveDifficulty(difficulty: AdditionDifficulty): void {
-		localStorage.setItem(KEY_DIFFICULTY, JSON.stringify(difficulty));
+		this.setItem(KEY_DIFFICULTY, difficulty);
 	}
 
 	getSubtractionDifficulty(): SubtractionDifficulty | null {
-		try {
-			const raw = localStorage.getItem(KEY_SUBTRACTION_DIFFICULTY);
-			if (raw === null) return null;
-			return JSON.parse(raw) as SubtractionDifficulty;
-		} catch {
-			return null;
-		}
+		return this.getItem<SubtractionDifficulty>(KEY_SUBTRACTION_DIFFICULTY);
 	}
 
 	saveSubtractionDifficulty(difficulty: SubtractionDifficulty): void {
-		localStorage.setItem(
-			KEY_SUBTRACTION_DIFFICULTY,
-			JSON.stringify(difficulty),
+		this.setItem(KEY_SUBTRACTION_DIFFICULTY, difficulty);
+	}
+
+	getMultiplicationDifficulty(): MultiplicationDifficulty | null {
+		return this.getItem<MultiplicationDifficulty>(
+			KEY_MULTIPLICATION_DIFFICULTY,
 		);
+	}
+
+	saveMultiplicationDifficulty(difficulty: MultiplicationDifficulty): void {
+		this.setItem(KEY_MULTIPLICATION_DIFFICULTY, difficulty);
 	}
 
 	getAttempts(): Attempt[] {
@@ -61,16 +73,10 @@ export class LocalStorageAdapter implements StoragePort {
 	}
 
 	getPeriodStart(): number | null {
-		try {
-			const raw = localStorage.getItem(KEY_PERIOD_START);
-			if (raw === null) return null;
-			return JSON.parse(raw) as number;
-		} catch {
-			return null;
-		}
+		return this.getItem<number>(KEY_PERIOD_START);
 	}
 
 	savePeriodStart(ts: number): void {
-		localStorage.setItem(KEY_PERIOD_START, JSON.stringify(ts));
+		this.setItem(KEY_PERIOD_START, ts);
 	}
 }

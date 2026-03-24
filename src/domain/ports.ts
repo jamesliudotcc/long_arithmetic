@@ -1,5 +1,6 @@
 import type { AdditionDifficulty } from "./addition";
 import type { Attempt } from "./attempt";
+import type { MultiplicationDifficulty } from "./multiplication";
 import type { SubtractionDifficulty } from "./subtraction";
 
 export interface StoragePort {
@@ -8,6 +9,9 @@ export interface StoragePort {
 
 	getSubtractionDifficulty(): SubtractionDifficulty | null;
 	saveSubtractionDifficulty(difficulty: SubtractionDifficulty): void;
+
+	getMultiplicationDifficulty(): MultiplicationDifficulty | null;
+	saveMultiplicationDifficulty(difficulty: MultiplicationDifficulty): void;
 
 	getAttempts(): Attempt[];
 	saveAttempt(attempt: Attempt): void;

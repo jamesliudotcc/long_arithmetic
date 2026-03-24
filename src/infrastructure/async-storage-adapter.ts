@@ -1,17 +1,21 @@
 import type { AdditionDifficulty } from "@domain/addition";
 import type { Attempt } from "@domain/attempt";
+import type { MultiplicationDifficulty } from "@domain/multiplication";
 import type { StoragePort } from "@domain/ports";
 import type { SubtractionDifficulty } from "@domain/subtraction";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const KEY_DIFFICULTY = "long-arithmetic:difficulty";
 const KEY_SUBTRACTION_DIFFICULTY = "long-arithmetic:subtraction_difficulty";
+const KEY_MULTIPLICATION_DIFFICULTY =
+	"long-arithmetic:multiplication_difficulty";
 const KEY_ATTEMPTS = "long-arithmetic:attempts";
 const KEY_PERIOD_START = "long-arithmetic:periodStart";
 
 const ALL_KEYS = [
 	KEY_DIFFICULTY,
 	KEY_SUBTRACTION_DIFFICULTY,
+	KEY_MULTIPLICATION_DIFFICULTY,
 	KEY_ATTEMPTS,
 	KEY_PERIOD_START,
 ] as const;
@@ -34,36 +38,46 @@ export class AsyncStorageAdapter implements StoragePort {
 		return new AsyncStorageAdapter(cache);
 	}
 
-	getDifficulty(): AdditionDifficulty | null {
+	private getCached<T>(key: string): T | null {
 		try {
-			const raw = this.cache.get(KEY_DIFFICULTY);
+			const raw = this.cache.get(key);
 			if (raw === undefined) return null;
-			return JSON.parse(raw) as AdditionDifficulty;
+			return JSON.parse(raw) as T;
 		} catch {
 			return null;
 		}
+	}
+
+	private setCached<T>(key: string, value: T): void {
+		const serialized = JSON.stringify(value);
+		this.cache.set(key, serialized);
+		AsyncStorage.setItem(key, serialized);
+	}
+
+	getDifficulty(): AdditionDifficulty | null {
+		return this.getCached<AdditionDifficulty>(KEY_DIFFICULTY);
 	}
 
 	saveDifficulty(difficulty: AdditionDifficulty): void {
-		const value = JSON.stringify(difficulty);
-		this.cache.set(KEY_DIFFICULTY, value);
-		AsyncStorage.setItem(KEY_DIFFICULTY, value);
+		this.setCached(KEY_DIFFICULTY, difficulty);
 	}
 
 	getSubtractionDifficulty(): SubtractionDifficulty | null {
-		try {
-			const raw = this.cache.get(KEY_SUBTRACTION_DIFFICULTY);
-			if (raw === undefined) return null;
-			return JSON.parse(raw) as SubtractionDifficulty;
-		} catch {
-			return null;
-		}
+		return this.getCached<SubtractionDifficulty>(KEY_SUBTRACTION_DIFFICULTY);
 	}
 
 	saveSubtractionDifficulty(difficulty: SubtractionDifficulty): void {
-		const value = JSON.stringify(difficulty);
-		this.cache.set(KEY_SUBTRACTION_DIFFICULTY, value);
-		AsyncStorage.setItem(KEY_SUBTRACTION_DIFFICULTY, value);
+		this.setCached(KEY_SUBTRACTION_DIFFICULTY, difficulty);
+	}
+
+	getMultiplicationDifficulty(): MultiplicationDifficulty | null {
+		return this.getCached<MultiplicationDifficulty>(
+			KEY_MULTIPLICATION_DIFFICULTY,
+		);
+	}
+
+	saveMultiplicationDifficulty(difficulty: MultiplicationDifficulty): void {
+		this.setCached(KEY_MULTIPLICATION_DIFFICULTY, difficulty);
 	}
 
 	getAttempts(): Attempt[] {
@@ -79,9 +93,7 @@ export class AsyncStorageAdapter implements StoragePort {
 	saveAttempt(attempt: Attempt): void {
 		const existing = this.getAttempts();
 		existing.push(attempt);
-		const value = JSON.stringify(existing);
-		this.cache.set(KEY_ATTEMPTS, value);
-		AsyncStorage.setItem(KEY_ATTEMPTS, value);
+		this.setCached(KEY_ATTEMPTS, existing);
 	}
 
 	clearAttempts(): void {
@@ -90,18 +102,10 @@ export class AsyncStorageAdapter implements StoragePort {
 	}
 
 	getPeriodStart(): number | null {
-		try {
-			const raw = this.cache.get(KEY_PERIOD_START);
-			if (raw === undefined) return null;
-			return JSON.parse(raw) as number;
-		} catch {
-			return null;
-		}
+		return this.getCached<number>(KEY_PERIOD_START);
 	}
 
 	savePeriodStart(ts: number): void {
-		const value = JSON.stringify(ts);
-		this.cache.set(KEY_PERIOD_START, value);
-		AsyncStorage.setItem(KEY_PERIOD_START, value);
+		this.setCached(KEY_PERIOD_START, ts);
 	}
 }

@@ -11,6 +11,50 @@ export type FinalSumEntry = {
 	status: "idle" | "correct" | "incorrect";
 };
 
+export type LatticeCellSolution = {
+	row: number;
+	col: number;
+	multiplicandPlace: Place;
+	multiplicandDigit: number;
+	multiplierDigit: number;
+	multiplierShift: number;
+	product: number;
+	tensDigit: number;
+	onesDigit: number;
+	tensDiagonal: number;
+	onesDiagonal: number;
+};
+
+export type LatticeDiagonalSolution = {
+	index: number;
+	contributions: number[];
+	carryIn: number;
+	sum: number;
+	resultDigit: number;
+	carryOut: number;
+};
+
+export type LatticeWorkEntry = {
+	answer: string;
+	status: "idle" | "correct" | "incorrect";
+};
+
+export type LatticeCellWork = {
+	tens: LatticeWorkEntry;
+	ones: LatticeWorkEntry;
+};
+
+export type LatticeWorkState = {
+	cells: LatticeCellWork[][];
+	diagonals: LatticeWorkEntry[];
+	solved: boolean;
+};
+
+export type LatticeSolution = {
+	cells: LatticeCellSolution[][];
+	diagonals: LatticeDiagonalSolution[];
+};
+
 export type FinalSumWork = {
 	entries: Partial<Record<Place, FinalSumEntry>>;
 	additionCarryEntries: Partial<Record<Place, FinalSumEntry>>;
@@ -143,7 +187,93 @@ export type MultiplicationSolution = {
 	digitProducts: DigitProduct[];
 	finalResult: FinalResultRow;
 	finalAdditionCarryIns: Partial<Record<Place, number>>;
+	lattice: LatticeSolution;
 };
+
+function emptyLatticeEntry(): LatticeWorkEntry {
+	return { answer: "", status: "idle" };
+}
+
+function computeLatticeSolved(work: LatticeWorkState): boolean {
+	return (
+		work.cells.every((row) =>
+			row.every(
+				(cell) =>
+					cell.tens.status === "correct" && cell.ones.status === "correct",
+			),
+		) && work.diagonals.every((entry) => entry.status === "correct")
+	);
+}
+
+export function initialLatticeWork(problem: MultiplicationProblem): LatticeWorkState {
+	return {
+		cells: Array.from({ length: problem.multiplierPlaces }, () =>
+			Array.from({ length: problem.numPlaces }, () => ({
+				tens: emptyLatticeEntry(),
+				ones: emptyLatticeEntry(),
+			})),
+		),
+		diagonals: Array.from(
+			{ length: problem.numPlaces + problem.multiplierPlaces },
+			() => emptyLatticeEntry(),
+		),
+		solved: false,
+	};
+}
+
+export function enterLatticeCellDigit(
+	work: LatticeWorkState,
+	solution: MultiplicationSolution,
+	row: number,
+	col: number,
+	half: "tens" | "ones",
+	digit: string,
+): LatticeWorkState {
+	const cellSolution = solution.lattice.cells[row]?.[col];
+	const cellWork = work.cells[row]?.[col];
+	if (!cellSolution || !cellWork) return work;
+
+	const expected =
+		half === "tens" ? cellSolution.tensDigit : cellSolution.onesDigit;
+	const status = digit === String(expected) ? "correct" : "incorrect";
+	const nextCells = work.cells.map((cellsRow, rowIndex) =>
+		cellsRow.map((entry, colIndex) => {
+			if (rowIndex !== row || colIndex !== col) return entry;
+			return {
+				...entry,
+				[half]: {
+					answer: digit,
+					status,
+				},
+			};
+		}),
+	);
+	const nextWork = {
+		...work,
+		cells: nextCells,
+	};
+	return { ...nextWork, solved: computeLatticeSolved(nextWork) };
+}
+
+export function enterLatticeDiagonalDigit(
+	work: LatticeWorkState,
+	solution: MultiplicationSolution,
+	index: number,
+	digit: string,
+): LatticeWorkState {
+	const diagonal = solution.lattice.diagonals[index];
+	if (!diagonal) return work;
+
+	const status = digit === String(diagonal.resultDigit) ? "correct" : "incorrect";
+	const diagonals = work.diagonals.map((entry, diagonalIndex): LatticeWorkEntry =>
+		diagonalIndex === index ? { answer: digit, status } : entry,
+	);
+	const nextWork = {
+		...work,
+		diagonals,
+	};
+	return { ...nextWork, solved: computeLatticeSolved(nextWork) };
+}
 
 function randInt(min: number, max: number, random: () => number): number {
 	return Math.floor(random() * (max - min + 1)) + min;
@@ -228,7 +358,72 @@ export function computeMultiplicationSolution(
 		addCarry = Math.floor(colSum / 10);
 	}
 
-	return { partialProducts, digitProducts, finalResult, finalAdditionCarryIns };
+	const latticeCells: LatticeCellSolution[][] = Array.from(
+		{ length: problem.multiplierPlaces },
+		(_, row) =>
+			Array.from({ length: problem.numPlaces }, (_, col) => {
+				const multiplicandPlaceIndex = problem.numPlaces - 1 - col;
+				const multiplicandPlace = PLACES[multiplicandPlaceIndex];
+				const multiplierShift = problem.multiplierPlaces - 1 - row;
+				const multiplierDigit =
+					Math.floor(problem.multiplier / 10 ** multiplierShift) % 10;
+				const multiplicandDigit = problem.multiplicand[multiplicandPlace];
+				const product = multiplicandDigit * multiplierDigit;
+				return {
+					row,
+					col,
+					multiplicandPlace,
+					multiplicandDigit,
+					multiplierDigit,
+					multiplierShift,
+					product,
+					tensDigit: Math.floor(product / 10),
+					onesDigit: product % 10,
+					tensDiagonal: multiplicandPlaceIndex + multiplierShift + 1,
+					onesDiagonal: multiplicandPlaceIndex + multiplierShift,
+				};
+			}),
+	);
+
+	const latticeDiagonals: LatticeDiagonalSolution[] = [];
+	let latticeCarry = 0;
+	for (
+		let diagonalIndex = 0;
+		diagonalIndex < problem.numPlaces + problem.multiplierPlaces;
+		diagonalIndex++
+	) {
+		const contributions: number[] = [];
+		for (const row of latticeCells) {
+			for (const cell of row) {
+				if (cell.onesDiagonal === diagonalIndex) contributions.push(cell.onesDigit);
+				if (cell.tensDiagonal === diagonalIndex) contributions.push(cell.tensDigit);
+			}
+		}
+		const sum = contributions.reduce((total, value) => total + value, latticeCarry);
+		const carryIn = latticeCarry;
+		const resultDigit = sum % 10;
+		const carryOut = Math.floor(sum / 10);
+		latticeDiagonals.push({
+			index: diagonalIndex,
+			contributions,
+			carryIn,
+			sum,
+			resultDigit,
+			carryOut,
+		});
+		latticeCarry = carryOut;
+	}
+
+	return {
+		partialProducts,
+		digitProducts,
+		finalResult,
+		finalAdditionCarryIns,
+		lattice: {
+			cells: latticeCells,
+			diagonals: latticeDiagonals,
+		},
+	};
 }
 
 export function generateMultiplicationProblem(

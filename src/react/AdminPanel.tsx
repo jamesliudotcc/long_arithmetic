@@ -1,11 +1,17 @@
 import type { AdditionDifficulty } from "@domain/addition";
+import type { MultiplicationDifficulty } from "@domain/multiplication";
 import type { SubtractionDifficulty } from "@domain/subtraction";
-import { type Mode, useAdditionStore } from "@react/store";
+import {
+	type Mode,
+	type MultiplicationMode,
+	useAdditionStore,
+} from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 const NUM_PLACES_OPTIONS = [1, 2, 3, 4] as const;
+const MULTIPLIER_PLACES_OPTIONS = [1, 2] as const;
 
 export function AdminPanel() {
 	const difficulty = useAdditionStore((s) => s.difficulty);
@@ -16,9 +22,17 @@ export function AdminPanel() {
 	const setSubtractionDifficulty = useAdditionStore(
 		(s) => s.setSubtractionDifficulty,
 	);
+	const multiplicationDifficulty = useAdditionStore(
+		(s) => s.multiplicationDifficulty,
+	);
+	const setMultiplicationDifficulty = useAdditionStore(
+		(s) => s.setMultiplicationDifficulty,
+	);
 	const operation = useAdditionStore((s) => s.operation);
 	const mode = useAdditionStore((s) => s.mode);
 	const setMode = useAdditionStore((s) => s.setMode);
+	const multiplicationMode = useAdditionStore((s) => s.multiplicationMode);
+	const setMultiplicationMode = useAdditionStore((s) => s.setMultiplicationMode);
 
 	const numCarriesOptions = Array.from(
 		{ length: difficulty.numPlaces + 1 },
@@ -30,6 +44,16 @@ export function AdminPanel() {
 		(_, i) => i,
 	);
 
+	const numPlacesOptions =
+		operation === "multiplication" ? ([1, 2, 3] as const) : NUM_PLACES_OPTIONS;
+
+	const activeDifficulty =
+		operation === "subtraction"
+			? subtractionDifficulty
+			: operation === "multiplication"
+				? multiplicationDifficulty
+				: difficulty;
+
 	function handleNumPlaces(n: (typeof NUM_PLACES_OPTIONS)[number]) {
 		if (operation === "subtraction") {
 			const numBorrows = Math.min(
@@ -37,6 +61,13 @@ export function AdminPanel() {
 				n - 1,
 			) as SubtractionDifficulty["numBorrows"];
 			setSubtractionDifficulty({ numPlaces: n, numBorrows });
+		} else if (operation === "multiplication") {
+			const numPlaces = n as MultiplicationDifficulty["numPlaces"];
+			const multiplierPlaces = Math.min(
+				multiplicationDifficulty.multiplierPlaces,
+				numPlaces,
+			) as MultiplicationDifficulty["multiplierPlaces"];
+			setMultiplicationDifficulty({ numPlaces, multiplierPlaces });
 		} else {
 			const numCarries = Math.min(
 				difficulty.numCarries,
@@ -60,13 +91,28 @@ export function AdminPanel() {
 		});
 	}
 
-	function handleSwitchOperation(target: "addition" | "subtraction") {
+	function handleMultiplierPlaces(
+		n: (typeof MULTIPLIER_PLACES_OPTIONS)[number],
+	) {
+		const multiplierPlaces = Math.min(
+			n,
+			multiplicationDifficulty.numPlaces,
+		) as MultiplicationDifficulty["multiplierPlaces"];
+		setMultiplicationDifficulty({
+			numPlaces: multiplicationDifficulty.numPlaces,
+			multiplierPlaces,
+		});
+	}
+
+	function handleSwitchOperation(
+		target: "addition" | "subtraction" | "multiplication",
+	) {
 		if (target === operation) return;
+		const numPlaces = activeDifficulty.numPlaces;
 		if (target === "subtraction") {
-			const numPlaces = difficulty.numPlaces;
 			const numBorrows = Math.min(
-				difficulty.numCarries,
 				numPlaces - 1,
+				operation === "addition" ? difficulty.numCarries : numPlaces - 1,
 			) as SubtractionDifficulty["numBorrows"];
 			router.push({
 				pathname: "/subtraction",
@@ -75,11 +121,12 @@ export function AdminPanel() {
 					numBorrows: String(numBorrows),
 				},
 			});
-		} else {
-			const numPlaces = subtractionDifficulty.numPlaces;
+		} else if (target === "addition") {
 			const numCarries = Math.min(
-				subtractionDifficulty.numBorrows,
 				numPlaces,
+				operation === "subtraction"
+					? subtractionDifficulty.numBorrows
+					: numPlaces,
 			) as AdditionDifficulty["numCarries"];
 			router.push({
 				pathname: "/addition",
@@ -88,52 +135,65 @@ export function AdminPanel() {
 					numCarries: String(numCarries),
 				},
 			});
+		} else {
+			router.push({
+				pathname: "/multiplication",
+				params: {
+					numDigits: String(numPlaces),
+					multiplierPlaces: String(multiplicationDifficulty.multiplierPlaces),
+					mode: multiplicationMode,
+				},
+			});
 		}
 	}
 
 	function handleReset() {
 		setDifficulty({ numPlaces: 3, numCarries: 2 });
 		setSubtractionDifficulty({ numPlaces: 3, numBorrows: 2 });
+		setMultiplicationDifficulty({ numPlaces: 2, multiplierPlaces: 1 });
 	}
-
-	const activeDifficulty =
-		operation === "subtraction" ? subtractionDifficulty : difficulty;
 
 	return (
 		<View style={styles.panel}>
 			<View style={styles.section}>
 				<Text style={styles.label}>Operation</Text>
 				<View style={styles.buttonRow}>
-					{(["addition", "subtraction"] as const).map((op) => (
-						<Pressable
-							key={op}
-							style={[
-								styles.optionButton,
-								styles.operationOptionButton,
-								operation === op && styles.optionButtonActive,
-							]}
-							onPress={() => handleSwitchOperation(op)}
-							// @ts-ignore — web-only
-							data-testid={`operation-btn-${op}`}
-							testID={`operation-btn-${op}`}
-						>
-							<Text
+					{(["addition", "subtraction", "multiplication"] as const).map(
+						(op) => (
+							<Pressable
+								key={op}
 								style={[
-									styles.optionText,
-									operation === op && styles.optionTextActive,
+									styles.optionButton,
+									styles.operationOptionButton,
+									operation === op && styles.optionButtonActive,
 								]}
+								onPress={() => handleSwitchOperation(op)}
+								// @ts-ignore — web-only
+								data-testid={`operation-btn-${op}`}
+								testID={`operation-btn-${op}`}
 							>
-								{op === "addition" ? "Addition" : "Subtraction"}
-							</Text>
-						</Pressable>
-					))}
+								<Text
+									style={[
+										styles.optionText,
+										operation === op && styles.optionTextActive,
+									]}
+								>
+									{op === "addition"
+										? "Addition"
+										: op === "subtraction"
+											? "Subtraction"
+											: "Multiplication"}
+								</Text>
+							</Pressable>
+						),
+					)}
 				</View>
 			</View>
 
 			<View style={styles.section}>
 				<Text style={styles.label}>Number of Digits</Text>
 				<View style={styles.buttonRow}>
-					{NUM_PLACES_OPTIONS.map((n) => (
+					{numPlacesOptions.map((n) => (
 						<Pressable
 							key={n}
 							style={[
@@ -180,7 +240,7 @@ export function AdminPanel() {
 						))}
 					</View>
 				</View>
-			) : (
+			) : operation === "subtraction" ? (
 				<View style={styles.section}>
 					<Text style={styles.label}>Number of Borrows</Text>
 					<View style={styles.buttonRow}>
@@ -207,34 +267,87 @@ export function AdminPanel() {
 						))}
 					</View>
 				</View>
+			) : (
+				<View style={styles.section}>
+					<Text style={styles.label}>Multiplier Digits</Text>
+					<View style={styles.buttonRow}>
+						{MULTIPLIER_PLACES_OPTIONS.filter(
+							(n) => n <= multiplicationDifficulty.numPlaces,
+						).map((n) => (
+							<Pressable
+								key={n}
+								style={[
+									styles.optionButton,
+									multiplicationDifficulty.multiplierPlaces === n &&
+										styles.optionButtonActive,
+								]}
+								onPress={() => handleMultiplierPlaces(n)}
+							>
+								<Text
+									style={[
+										styles.optionText,
+										multiplicationDifficulty.multiplierPlaces === n &&
+											styles.optionTextActive,
+									]}
+								>
+									{n}
+								</Text>
+							</Pressable>
+						))}
+					</View>
+				</View>
 			)}
 
 			<View style={styles.section}>
 				<Text style={styles.label}>Mode</Text>
 				<View style={styles.buttonRow}>
-					{(["digit", "visual"] as Mode[]).map((m) => (
-						<Pressable
-							key={m}
-							style={[
-								styles.optionButton,
-								styles.modeButton,
-								mode === m && styles.optionButtonActive,
-							]}
-							onPress={() => setMode(m)}
-							// @ts-ignore — web-only
-							data-testid={`mode-btn-${m}`}
-							testID={`mode-btn-${m}`}
-						>
-							<Text
-								style={[
-									styles.optionText,
-									mode === m && styles.optionTextActive,
-								]}
-							>
-								{m === "digit" ? "Digit" : "Visual"}
-							</Text>
-						</Pressable>
-					))}
+					{operation === "multiplication"
+						? (["digit", "lattice"] as MultiplicationMode[]).map((m) => (
+								<Pressable
+									key={m}
+									style={[
+										styles.optionButton,
+										styles.modeButton,
+										multiplicationMode === m && styles.optionButtonActive,
+									]}
+									onPress={() => setMultiplicationMode(m)}
+									// @ts-ignore — web-only
+									data-testid={`mode-btn-${m}`}
+									testID={`mode-btn-${m}`}
+								>
+									<Text
+										style={[
+											styles.optionText,
+											multiplicationMode === m && styles.optionTextActive,
+										]}
+									>
+										{m === "digit" ? "Digit" : "Lattice"}
+									</Text>
+								</Pressable>
+							))
+						: (["digit", "visual"] as Mode[]).map((m) => (
+								<Pressable
+									key={m}
+									style={[
+										styles.optionButton,
+										styles.modeButton,
+										mode === m && styles.optionButtonActive,
+									]}
+									onPress={() => setMode(m)}
+									// @ts-ignore — web-only
+									data-testid={`mode-btn-${m}`}
+									testID={`mode-btn-${m}`}
+								>
+									<Text
+										style={[
+											styles.optionText,
+											mode === m && styles.optionTextActive,
+										]}
+									>
+										{m === "digit" ? "Digit" : "Visual"}
+									</Text>
+								</Pressable>
+							))}
 				</View>
 			</View>
 
