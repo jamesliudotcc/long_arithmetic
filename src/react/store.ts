@@ -9,6 +9,15 @@ import {
 } from "@domain/addition";
 import { type Attempt, createAttempt } from "@domain/attempt";
 import {
+	DEFAULT_CIRCLES_DIFFICULTY,
+	type CircleMeasureKind,
+	type CirclesDifficulty,
+	type CirclesProblem,
+	type CirclesSolution,
+	computeCirclesSolution,
+	generateCirclesProblem,
+} from "@domain/circles";
+import {
 	type FinalSumWork,
 	type LatticeWorkState,
 	type MultiplicationDifficulty,
@@ -54,6 +63,11 @@ export type CellStatus = "idle" | "correct" | "incorrect";
 
 export type Mode = "digit" | "visual";
 export type MultiplicationMode = "digit" | "lattice";
+export type Operation =
+	| "addition"
+	| "subtraction"
+	| "multiplication"
+	| "circles";
 
 type PlaceWorkEntry = {
 	answer: string; // "" | "0"–"9"
@@ -91,6 +105,14 @@ type MultiplicationWorkState = {
 	solved: boolean;
 };
 
+type CirclesWorkState = {
+	segmentAnswer: CircleMeasureKind | null;
+	segmentStatus: CellStatus;
+	measureAnswer: string;
+	measureStatus: CellStatus;
+	solved: boolean;
+};
+
 type State = {
 	problem: AdditionProblem;
 	difficulty: AdditionDifficulty;
@@ -101,7 +123,7 @@ type State = {
 	multiplicationMode: MultiplicationMode;
 	attempts: Attempt[];
 	periodStart: number;
-	operation: "addition" | "subtraction" | "multiplication";
+	operation: Operation;
 	subtractionDifficulty: SubtractionDifficulty;
 	subtractionProblem: SubtractionProblem;
 	subtractionSolution: SubtractionSolution;
@@ -113,6 +135,10 @@ type State = {
 	multiplicationWork: MultiplicationWorkState;
 	latticeWork: LatticeWorkState;
 	finalSumWork: FinalSumWork;
+	circlesDifficulty: CirclesDifficulty;
+	circlesProblem: CirclesProblem;
+	circlesSolution: CirclesSolution;
+	circlesWork: CirclesWorkState;
 	toolboxOpen: boolean;
 };
 
@@ -127,9 +153,10 @@ type Actions = {
 	setMultiplicationMode: (mode: MultiplicationMode) => void;
 	moveVisualDisk: (place: Place, from: VisualZone) => void;
 	carryVisual: (place: Place, zone: VisualZone) => void;
-	setOperation: (op: "addition" | "subtraction" | "multiplication") => void;
+	setOperation: (op: Operation) => void;
 	setSubtractionDifficulty: (difficulty: SubtractionDifficulty) => void;
 	setMultiplicationDifficulty: (difficulty: MultiplicationDifficulty) => void;
+	setCirclesDifficulty: (difficulty: CirclesDifficulty) => void;
 	setToolboxOpen: (open: boolean) => void;
 	enterSubtractionAnswer: (place: Place, digit: string) => void;
 	enterSubtractionBorrow: (place: Place, digit: string) => void;
@@ -150,6 +177,8 @@ type Actions = {
 		digit: string,
 	) => void;
 	enterLatticeDiagonal: (index: number, digit: string) => void;
+	answerCircleSegment: (kind: CircleMeasureKind) => void;
+	enterCircleMeasure: (value: string) => void;
 };
 
 const DEFAULT_DIFFICULTY: AdditionDifficulty = { numPlaces: 3, numCarries: 2 };
@@ -176,6 +205,7 @@ export function initializeStorage(storage: StoragePort): void {
 	const savedDifficulty = storage.getDifficulty();
 	const savedSubtractionDifficulty = storage.getSubtractionDifficulty();
 	const savedMultiplicationDifficulty = storage.getMultiplicationDifficulty();
+	const savedCirclesDifficulty = storage.getCirclesDifficulty();
 	const attempts = storage.getAttempts();
 	const savedPeriodStart = storage.getPeriodStart();
 	const periodStart =
@@ -219,6 +249,14 @@ export function initializeStorage(storage: StoragePort): void {
 		);
 		nextState.latticeWork = initialLatticeWork(mulProb);
 		nextState.finalSumWork = initialFinalSumWorkForProblem(mulProb);
+	}
+
+	if (savedCirclesDifficulty) {
+		const circlesProblem = generateCirclesProblem(savedCirclesDifficulty);
+		nextState.circlesDifficulty = savedCirclesDifficulty;
+		nextState.circlesProblem = circlesProblem;
+		nextState.circlesSolution = computeCirclesSolution(circlesProblem);
+		nextState.circlesWork = initialCirclesWork();
 	}
 
 	useAdditionStore.setState(nextState);
@@ -278,6 +316,16 @@ function initialMultiplicationWork(
 	return {
 		rows: Array.from({ length: multiplierPlaces }, () => initialWork()),
 		activeRow: 0,
+		solved: false,
+	};
+}
+
+function initialCirclesWork(): CirclesWorkState {
+	return {
+		segmentAnswer: null,
+		segmentStatus: "idle",
+		measureAnswer: "",
+		measureStatus: "idle",
 		solved: false,
 	};
 }
@@ -391,7 +439,12 @@ function recordAttemptInternal(
 	correct: boolean,
 ): void {
 	const { mode, multiplicationMode, operation } = useAdditionStore.getState();
-	const attemptMode = operation === "multiplication" ? multiplicationMode : mode;
+	const attemptMode =
+		operation === "multiplication"
+			? multiplicationMode
+			: operation === "circles"
+				? "digit"
+				: mode;
 	const attempt = createAttempt(numPlaces, correct, attemptMode, operation);
 	_storage.saveAttempt(attempt);
 	useAdditionStore.setState((s) => ({ attempts: [...s.attempts, attempt] }));
@@ -407,6 +460,7 @@ const initialVisualSubWorkState = initialVisualSubWork(
 const initialMultiplicationProblem = generateMultiplicationProblem(
 	DEFAULT_MULTIPLICATION_DIFFICULTY,
 );
+const initialCirclesProblem = generateCirclesProblem(DEFAULT_CIRCLES_DIFFICULTY);
 
 export const useAdditionStore = create<State & Actions>()((set, get) => ({
 	difficulty: DEFAULT_DIFFICULTY,
@@ -434,6 +488,10 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 	),
 	latticeWork: initialLatticeWork(initialMultiplicationProblem),
 	finalSumWork: initialFinalSumWorkForProblem(initialMultiplicationProblem),
+	circlesDifficulty: DEFAULT_CIRCLES_DIFFICULTY,
+	circlesProblem: initialCirclesProblem,
+	circlesSolution: computeCirclesSolution(initialCirclesProblem),
+	circlesWork: initialCirclesWork(),
 	toolboxOpen: false,
 
 	newProblem: () => {
@@ -453,6 +511,9 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			mode,
 			multiplicationMode,
 			latticeWork,
+			circlesDifficulty,
+			circlesProblem,
+			circlesWork,
 		} = get();
 
 		if (operation === "subtraction") {
@@ -485,6 +546,16 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 				),
 				latticeWork: initialLatticeWork(newProb),
 				finalSumWork: initialFinalSumWorkForProblem(newProb),
+			});
+		} else if (operation === "circles") {
+			if (!circlesWork.solved) {
+				recordAttemptInternal(1, false);
+			}
+			const newProb = generateCirclesProblem(circlesDifficulty);
+			set({
+				circlesProblem: newProb,
+				circlesSolution: computeCirclesSolution(newProb),
+				circlesWork: initialCirclesWork(),
 			});
 		} else {
 			const activeModeSolved =
@@ -648,7 +719,7 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 		set({ visualWork: newWork });
 	},
 
-	setOperation: (op: "addition" | "subtraction" | "multiplication") => {
+	setOperation: (op: Operation) => {
 		const {
 			operation,
 			work,
@@ -662,6 +733,7 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			mode,
 			multiplicationMode,
 			latticeWork,
+			circlesWork,
 		} = get();
 		if (operation === op) return;
 
@@ -677,8 +749,7 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			if (!subActiveSolved) {
 				recordAttemptInternal(subtractionProblem.numPlaces, false);
 			}
-		} else {
-			// multiplication
+		} else if (operation === "multiplication") {
 			const multiplicationSolved =
 				multiplicationMode === "lattice"
 					? latticeWork.solved
@@ -686,6 +757,8 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			if (!multiplicationSolved) {
 				recordAttemptInternal(multiplicationProblem.numPlaces, false);
 			}
+		} else if (!circlesWork.solved) {
+			recordAttemptInternal(1, false);
 		}
 
 		set({ operation: op });
@@ -742,6 +815,21 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			),
 			latticeWork: initialLatticeWork(newProb),
 			finalSumWork: initialFinalSumWorkForProblem(newProb),
+		});
+	},
+
+	setCirclesDifficulty: (difficulty: CirclesDifficulty) => {
+		const { circlesWork, circlesProblem } = get();
+		if (!circlesWork.solved) {
+			recordAttemptInternal(1, false);
+		}
+		_storage.saveCirclesDifficulty(difficulty);
+		const newProb = generateCirclesProblem(difficulty);
+		set({
+			circlesDifficulty: difficulty,
+			circlesProblem: newProb,
+			circlesSolution: computeCirclesSolution(newProb),
+			circlesWork: initialCirclesWork(),
 		});
 	},
 
@@ -1168,5 +1256,43 @@ export const useAdditionStore = create<State & Actions>()((set, get) => ({
 			recordAttemptInternal(multiplicationProblem.numPlaces, true);
 		}
 		set({ latticeWork: nextWork });
+	},
+
+	answerCircleSegment: (kind: CircleMeasureKind) => {
+		const { circlesProblem, circlesWork } = get();
+		if (circlesProblem.kind !== "identify_segment" || circlesWork.solved) return;
+		const correct = kind === circlesProblem.segmentKind;
+		if (correct && !circlesWork.solved) {
+			recordAttemptInternal(1, true);
+		}
+		set({
+			circlesWork: {
+				...circlesWork,
+				segmentAnswer: kind,
+				segmentStatus: correct ? "correct" : "incorrect",
+				solved: correct,
+			},
+		});
+	},
+
+	enterCircleMeasure: (value: string) => {
+		const { circlesProblem, circlesSolution, circlesWork } = get();
+		if (circlesProblem.kind !== "derive_missing_measure" || circlesWork.solved) {
+			return;
+		}
+		if (circlesSolution.kind !== "derive_missing_measure") return;
+		const correct = value === String(circlesSolution.missingLengthCm);
+		if (correct && !circlesWork.solved) {
+			recordAttemptInternal(1, true);
+		}
+		set({
+			circlesWork: {
+				...circlesWork,
+				measureAnswer: value,
+				measureStatus:
+					value.length === 0 ? "idle" : correct ? "correct" : "incorrect",
+				solved: correct,
+			},
+		});
 	},
 }));

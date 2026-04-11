@@ -31,4 +31,10 @@ describe("createAttempt", () => {
 		expect(attempt.mode).toBe("digit");
 		expect(attempt.operation).toBe("addition");
 	});
+
+	it("accepts circles attempts", () => {
+		const attempt = createAttempt(1, true, "digit", "circles", 77);
+		expect(attempt.operation).toBe("circles");
+		expect(attempt.timestamp).toBe(77);
+	});
 });

@@ -16,7 +16,7 @@ function LatticeInput({
 	status: CellStatus;
 	onChangeText: (digit: string) => void;
 	testID: string;
-	align: "topLeft" | "bottomRight";
+	align: "topLeft" | "bottomLeft" | "bottomRight";
 }) {
 	return (
 		<View
@@ -27,7 +27,11 @@ function LatticeInput({
 					: status === "incorrect"
 						? styles.incorrectShell
 						: styles.idleShell,
-				align === "topLeft" ? styles.topLeftShell : styles.bottomRightShell,
+				align === "topLeft"
+					? styles.topLeftShell
+					: align === "bottomLeft"
+						? styles.bottomLeftShell
+						: styles.bottomRightShell,
 			]}
 		>
 			<TextInput
@@ -46,7 +50,11 @@ function LatticeInput({
 				testID={testID}
 				style={[
 					styles.inputText,
-					align === "topLeft" ? styles.topLeftText : styles.bottomRightText,
+					align === "topLeft"
+						? styles.topLeftText
+						: align === "bottomLeft"
+							? styles.bottomLeftText
+							: styles.bottomRightText,
 					status === "correct"
 						? styles.correctText
 						: status === "incorrect"
@@ -107,9 +115,12 @@ export function MultiplicationLatticeSolver() {
 	const enterLatticeCell = useAdditionStore((s) => s.enterLatticeCell);
 	const enterLatticeDiagonal = useAdditionStore((s) => s.enterLatticeDiagonal);
 
-	const multiplicandDigits = Array.from({ length: problem.numPlaces }, (_, col) => {
-		return solution.lattice.cells[0][col].multiplicandDigit;
-	});
+	const multiplicandDigits = Array.from(
+		{ length: problem.numPlaces },
+		(_, col) => {
+			return solution.lattice.cells[0][col].multiplicandDigit;
+		},
+	);
 	const multiplierDigits = Array.from(
 		{ length: problem.multiplierPlaces },
 		(_, row) => solution.lattice.cells[row][0].multiplierDigit,
@@ -138,15 +149,18 @@ export function MultiplicationLatticeSolver() {
 				return (
 					<View key={`row-${rowIndex}`} style={styles.gridRow}>
 						<View style={styles.leftGutter}>
-							<LatticeInput
-								value={work.diagonals[leftDiagonalIndex]?.answer ?? ""}
-								status={work.diagonals[leftDiagonalIndex]?.status ?? "idle"}
-								onChangeText={(digit) =>
-									enterLatticeDiagonal(leftDiagonalIndex, digit)
-								}
-								testID={`lattice-diagonal-${leftDiagonalIndex}`}
-								align="topLeft"
-							/>
+							<View style={styles.leftResultGuide} pointerEvents="none" />
+							<View style={styles.leftResultInputWrap}>
+								<LatticeInput
+									value={work.diagonals[leftDiagonalIndex]?.answer ?? ""}
+									status={work.diagonals[leftDiagonalIndex]?.status ?? "idle"}
+									onChangeText={(digit) =>
+										enterLatticeDiagonal(leftDiagonalIndex, digit)
+									}
+									testID={`lattice-diagonal-${leftDiagonalIndex}`}
+									align="bottomLeft"
+								/>
+							</View>
 						</View>
 						{row.map((cell, colIndex) => {
 							const cellWork = work.cells[rowIndex][colIndex];
@@ -168,7 +182,9 @@ export function MultiplicationLatticeSolver() {
 							);
 						})}
 						<View style={styles.rightGutter}>
-							<Text style={styles.headerText}>{multiplierDigits[rowIndex]}</Text>
+							<Text style={styles.headerText}>
+								{multiplierDigits[rowIndex]}
+							</Text>
 						</View>
 					</View>
 				);
@@ -180,15 +196,18 @@ export function MultiplicationLatticeSolver() {
 					const diagonalIndex = problem.numPlaces - 1 - col;
 					return (
 						<View key={`bottom-${col}`} style={styles.bottomCell}>
-							<LatticeInput
-								value={work.diagonals[diagonalIndex]?.answer ?? ""}
-								status={work.diagonals[diagonalIndex]?.status ?? "idle"}
-								onChangeText={(digit) =>
-									enterLatticeDiagonal(diagonalIndex, digit)
-								}
-								testID={`lattice-diagonal-${diagonalIndex}`}
-								align="bottomRight"
-							/>
+							<View style={styles.bottomResultGuide} pointerEvents="none" />
+							<View style={styles.bottomResultInputWrap}>
+								<LatticeInput
+									value={work.diagonals[diagonalIndex]?.answer ?? ""}
+									status={work.diagonals[diagonalIndex]?.status ?? "idle"}
+									onChangeText={(digit) =>
+										enterLatticeDiagonal(diagonalIndex, digit)
+									}
+									testID={`lattice-diagonal-${diagonalIndex}`}
+									align="bottomLeft"
+								/>
+							</View>
 						</View>
 					);
 				})}
@@ -206,6 +225,10 @@ export function MultiplicationLatticeSolver() {
 
 const TRIANGLE_INPUT_WIDTH = 48;
 const TRIANGLE_INPUT_HEIGHT = 42;
+const DIAGONAL_STROKE_WIDTH = 2;
+const CELL_DIAGONAL_OVERHANG = 10;
+const RESULT_DIAGONAL_LENGTH = 108;
+const RESULT_INPUT_INSET = 8;
 
 const styles = StyleSheet.create({
 	container: {
@@ -227,8 +250,8 @@ const styles = StyleSheet.create({
 	leftGutter: {
 		width: LATTICE_CELL_SIZE,
 		height: LATTICE_CELL_SIZE,
-		alignItems: "center",
-		justifyContent: "center",
+		position: "relative",
+		overflow: "visible",
 	},
 	rightGutter: {
 		width: LATTICE_CELL_SIZE,
@@ -245,8 +268,8 @@ const styles = StyleSheet.create({
 	bottomCell: {
 		width: LATTICE_CELL_SIZE,
 		height: LATTICE_CELL_SIZE,
-		alignItems: "center",
-		justifyContent: "center",
+		position: "relative",
+		overflow: "visible",
 	},
 	headerText: {
 		fontSize: typography.fontSize["2xl"],
@@ -264,12 +287,44 @@ const styles = StyleSheet.create({
 	},
 	diagonal: {
 		position: "absolute",
-		left: -3,
-		top: LATTICE_CELL_SIZE / 2 - 1,
-		width: LATTICE_CELL_SIZE + 6,
-		height: 2,
+		left: -CELL_DIAGONAL_OVERHANG / 2,
+		top: LATTICE_CELL_SIZE / 2 - DIAGONAL_STROKE_WIDTH / 2,
+		width: LATTICE_CELL_SIZE + CELL_DIAGONAL_OVERHANG,
+		height: DIAGONAL_STROKE_WIDTH,
 		backgroundColor: colors.text,
 		transform: [{ rotate: "-45deg" }],
+	},
+	leftResultGuide: {
+		position: "absolute",
+		left: 16,
+		top: 56,
+		width: RESULT_DIAGONAL_LENGTH,
+		height: DIAGONAL_STROKE_WIDTH,
+		backgroundColor: colors.text,
+		transform: [{ rotate: "-45deg" }],
+	},
+	bottomResultGuide: {
+		position: "absolute",
+		left: -10,
+		top: 24,
+		width: RESULT_DIAGONAL_LENGTH,
+		height: DIAGONAL_STROKE_WIDTH,
+		backgroundColor: colors.text,
+		transform: [{ rotate: "-45deg" }],
+	},
+	leftResultInputWrap: {
+		position: "absolute",
+		left: RESULT_INPUT_INSET,
+		bottom: RESULT_INPUT_INSET,
+		width: TRIANGLE_INPUT_WIDTH,
+		height: TRIANGLE_INPUT_HEIGHT,
+	},
+	bottomResultInputWrap: {
+		position: "absolute",
+		left: RESULT_INPUT_INSET,
+		bottom: RESULT_INPUT_INSET,
+		width: TRIANGLE_INPUT_WIDTH,
+		height: TRIANGLE_INPUT_HEIGHT,
 	},
 	tensWrap: {
 		position: "absolute",
@@ -301,6 +356,10 @@ const styles = StyleSheet.create({
 		bottom: 0,
 		right: 0,
 	},
+	bottomLeftShell: {
+		bottom: 0,
+		left: 0,
+	},
 	idleShell: {
 		borderColor: colors.border,
 		backgroundColor: colors.background,
@@ -327,6 +386,10 @@ const styles = StyleSheet.create({
 		paddingTop: 4,
 	},
 	bottomRightText: {
+		textAlign: "center",
+		paddingTop: 4,
+	},
+	bottomLeftText: {
 		textAlign: "center",
 		paddingTop: 4,
 	},

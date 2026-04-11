@@ -1,5 +1,6 @@
 import type { AdditionDifficulty } from "@domain/addition";
 import type { Attempt } from "@domain/attempt";
+import type { CirclesDifficulty } from "@domain/circles";
 import type { MultiplicationDifficulty } from "@domain/multiplication";
 import type { StoragePort } from "@domain/ports";
 import type { SubtractionDifficulty } from "@domain/subtraction";
@@ -8,6 +9,7 @@ const KEY_DIFFICULTY = "long-arithmetic:difficulty";
 const KEY_SUBTRACTION_DIFFICULTY = "long-arithmetic:subtraction_difficulty";
 const KEY_MULTIPLICATION_DIFFICULTY =
 	"long-arithmetic:multiplication_difficulty";
+const KEY_CIRCLES_DIFFICULTY = "long-arithmetic:circles_difficulty";
 const KEY_ATTEMPTS = "long-arithmetic:attempts";
 const KEY_PERIOD_START = "long-arithmetic:periodStart";
 
@@ -50,6 +52,14 @@ export class LocalStorageAdapter implements StoragePort {
 
 	saveMultiplicationDifficulty(difficulty: MultiplicationDifficulty): void {
 		this.setItem(KEY_MULTIPLICATION_DIFFICULTY, difficulty);
+	}
+
+	getCirclesDifficulty(): CirclesDifficulty | null {
+		return this.getItem<CirclesDifficulty>(KEY_CIRCLES_DIFFICULTY);
+	}
+
+	saveCirclesDifficulty(difficulty: CirclesDifficulty): void {
+		this.setItem(KEY_CIRCLES_DIFFICULTY, difficulty);
 	}
 
 	getAttempts(): Attempt[] {

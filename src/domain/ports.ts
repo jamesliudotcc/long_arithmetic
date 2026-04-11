@@ -1,4 +1,5 @@
 import type { AdditionDifficulty } from "./addition";
+import type { CirclesDifficulty } from "./circles";
 import type { Attempt } from "./attempt";
 import type { MultiplicationDifficulty } from "./multiplication";
 import type { SubtractionDifficulty } from "./subtraction";
@@ -12,6 +13,9 @@ export interface StoragePort {
 
 	getMultiplicationDifficulty(): MultiplicationDifficulty | null;
 	saveMultiplicationDifficulty(difficulty: MultiplicationDifficulty): void;
+
+	getCirclesDifficulty(): CirclesDifficulty | null;
+	saveCirclesDifficulty(difficulty: CirclesDifficulty): void;
 
 	getAttempts(): Attempt[];
 	saveAttempt(attempt: Attempt): void;

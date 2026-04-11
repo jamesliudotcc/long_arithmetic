@@ -1,5 +1,6 @@
 import type { AdditionDifficulty } from "@domain/addition";
 import type { Attempt } from "@domain/attempt";
+import type { CirclesDifficulty } from "@domain/circles";
 import type { MultiplicationDifficulty } from "@domain/multiplication";
 import type { StoragePort } from "@domain/ports";
 import type { SubtractionDifficulty } from "@domain/subtraction";
@@ -8,6 +9,7 @@ export class InMemoryStorage implements StoragePort {
 	private difficulty: AdditionDifficulty | null = null;
 	private subtractionDifficultyValue: SubtractionDifficulty | null = null;
 	private multiplicationDifficultyValue: MultiplicationDifficulty | null = null;
+	private circlesDifficultyValue: CirclesDifficulty | null = null;
 	private attempts: Attempt[] = [];
 	private periodStart: number | null = null;
 
@@ -33,6 +35,14 @@ export class InMemoryStorage implements StoragePort {
 
 	saveMultiplicationDifficulty(difficulty: MultiplicationDifficulty): void {
 		this.multiplicationDifficultyValue = difficulty;
+	}
+
+	getCirclesDifficulty(): CirclesDifficulty | null {
+		return this.circlesDifficultyValue;
+	}
+
+	saveCirclesDifficulty(difficulty: CirclesDifficulty): void {
+		this.circlesDifficultyValue = difficulty;
 	}
 
 	getAttempts(): Attempt[] {
