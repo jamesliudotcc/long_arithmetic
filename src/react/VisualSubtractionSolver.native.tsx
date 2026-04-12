@@ -1,5 +1,8 @@
 import { PLACES, type Place } from "@domain/addition";
-import { canBorrowFrom as domainCanBorrowFrom } from "@domain/visual-subtraction";
+import {
+	canBorrowFrom as domainCanBorrowFrom,
+	canCancelSub as domainCanCancelSub,
+} from "@domain/visual-subtraction";
 import { PlaceDiscs } from "@react/PlaceDiscs";
 import { useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
@@ -100,6 +103,7 @@ export function VisualSubtractionSolver() {
 		const label = PLACE_LABELS[place];
 
 		const canLend = isNextColumn && domainCanBorrowFrom(col);
+		const canCancel = isActive && domainCanCancelSub(col);
 		const isBorrowTarget =
 			isActive && draggingFrom === PLACES[activeColumn + 1];
 
@@ -161,11 +165,11 @@ export function VisualSubtractionSolver() {
 							denomination={PLACE_DENOMINATIONS[place]}
 							color={color}
 							solved={colSolved}
-							locked={!isActive && !isNextColumn}
+							locked={(!isActive && !isNextColumn) || (isActive && !canCancel)}
 							canCarry={canLend}
 							isDragSource={draggingFrom === place}
 							onDiskPointerDown={
-								isActive ? () => cancelVisualSub(place) : undefined
+								canCancel ? () => cancelVisualSub(place) : undefined
 							}
 							testID={`visual-sub-minuend-${place}`}
 							diskTestIDPrefix={`visual-sub-minuend-disk-${place}`}
@@ -181,8 +185,11 @@ export function VisualSubtractionSolver() {
 					denomination={PLACE_DENOMINATIONS[place]}
 					color={color}
 					solved={colSolved}
-					locked={true}
+					locked={!canCancel}
 					canCarry={false}
+					onDiskPointerDown={
+						canCancel ? () => cancelVisualSub(place) : undefined
+					}
 					testID={`visual-sub-subtrahend-${place}`}
 					diskTestIDPrefix={`visual-sub-subtrahend-disk-${place}`}
 				/>

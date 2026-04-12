@@ -1,5 +1,8 @@
 import { PLACES, type Place } from "@domain/addition";
-import { canBorrowFrom as domainCanBorrowFrom } from "@domain/visual-subtraction";
+import {
+	canBorrowFrom as domainCanBorrowFrom,
+	canCancelSub as domainCanCancelSub,
+} from "@domain/visual-subtraction";
 import { PlaceDiscs } from "@react/PlaceDiscs";
 import { useAdditionStore } from "@react/store";
 import { colors, radius, spacing, typography } from "@react/theme";
@@ -27,6 +30,15 @@ const PLACE_LABELS: Record<Place, string> = {
 	hundreds_pl: "100s",
 	thousands_pl: "1,000s",
 };
+
+function getPlaceFromTestId(
+	testId: string | null,
+	prefix: string,
+): Place | undefined {
+	if (!testId?.startsWith(prefix)) return undefined;
+	const key = testId.slice(prefix.length);
+	return PLACES.includes(key as Place) ? (key as Place) : undefined;
+}
 
 export function VisualSubtractionSolver() {
 	const subtractionProblem = useAdditionStore((s) => s.subtractionProblem);
@@ -117,17 +129,19 @@ export function VisualSubtractionSolver() {
 		let el: Element | null = document.elementFromPoint(clientX, clientY);
 		while (el) {
 			const testId = el.getAttribute("data-testid");
-			if (testId?.startsWith("visual-sub-borrow-")) {
-				const key = testId.replace("visual-sub-borrow-", "") as Place;
-				handleDrop(key);
+			const borrowPlace = getPlaceFromTestId(testId, "visual-sub-borrow-");
+			if (borrowPlace) {
+				handleDrop(borrowPlace);
 				return;
 			}
+
 			// An empty minuend zone is also a valid drop target (borrow + auto-drain
 			// will fill it immediately)
-			if (testId?.startsWith("visual-sub-minuend-")) {
-				const key = testId.replace("visual-sub-minuend-", "") as Place;
-				if (visualSubWork.columns[key].minuend === 0) {
-					handleDrop(key);
+			const minuendPlace = getPlaceFromTestId(testId, "visual-sub-minuend-");
+			if (minuendPlace) {
+				const column = visualSubWork.columns[minuendPlace];
+				if (column?.minuend === 0) {
+					handleDrop(minuendPlace);
 					return;
 				}
 			}
@@ -149,6 +163,7 @@ export function VisualSubtractionSolver() {
 		const label = PLACE_LABELS[place];
 
 		const canLend = isNextColumn && domainCanBorrowFrom(col);
+		const canCancel = isActive && domainCanCancelSub(col);
 		const isBorrowTarget =
 			isActive && draggingFrom === PLACES[activeColumn + 1];
 
@@ -191,11 +206,11 @@ export function VisualSubtractionSolver() {
 					denomination={PLACE_DENOMINATIONS[place]}
 					color={color}
 					solved={colSolved}
-					locked={!isActive && !isNextColumn}
+					locked={(!isActive && !isNextColumn) || (isActive && !canCancel)}
 					canCarry={canLend}
 					isDragSource={draggingFrom === place}
 					onDiskPointerDown={
-						isActive ? () => cancelVisualSub(place) : undefined
+						canCancel ? () => cancelVisualSub(place) : undefined
 					}
 					onCarryDragStart={
 						isNextColumn ? () => setDraggingFrom(place) : undefined
@@ -212,10 +227,10 @@ export function VisualSubtractionSolver() {
 					denomination={PLACE_DENOMINATIONS[place]}
 					color={color}
 					solved={colSolved}
-					locked={!isActive}
+					locked={!isActive || !canCancel}
 					canCarry={false}
 					onDiskPointerDown={
-						isActive ? () => cancelVisualSub(place) : undefined
+						canCancel ? () => cancelVisualSub(place) : undefined
 					}
 					testID={`visual-sub-subtrahend-${place}`}
 					diskTestIDPrefix={`visual-sub-subtrahend-disk-${place}`}

@@ -4,6 +4,7 @@ import {
 	applySubCancel,
 	applySubMoveBorrowDown,
 	canBorrowFrom,
+	canCancelSub,
 	initialVisualSubWork,
 	isSubColumnDone,
 } from "./visual-subtraction";
@@ -48,6 +49,21 @@ describe("canBorrowFrom", () => {
 
 	it("minuend = 0 → false", () => {
 		expect(canBorrowFrom({ borrow: 0, minuend: 0, subtrahend: 3 })).toBe(false);
+	});
+});
+
+describe("canCancelSub", () => {
+	it("allows cancellation whenever the visible top row covers the subtrahend", () => {
+		expect(canCancelSub({ borrow: 0, minuend: 5, subtrahend: 3 })).toBe(true);
+		expect(canCancelSub({ borrow: 0, minuend: 3, subtrahend: 3 })).toBe(true);
+		expect(canCancelSub({ borrow: 6, minuend: 7, subtrahend: 7 })).toBe(true);
+		expect(canCancelSub({ borrow: 5, minuend: 8, subtrahend: 7 })).toBe(true);
+	});
+
+	it("blocks cancellation when the visible top row still does not cover the subtrahend", () => {
+		expect(canCancelSub({ borrow: 0, minuend: 3, subtrahend: 7 })).toBe(false);
+		expect(canCancelSub({ borrow: 10, minuend: 3, subtrahend: 7 })).toBe(false);
+		expect(canCancelSub({ borrow: 1, minuend: 0, subtrahend: 1 })).toBe(false);
 	});
 });
 
@@ -134,6 +150,32 @@ describe("applySubCancel", () => {
 		expect(next).toBe(work);
 	});
 
+	it("guard: borrow required before cancellation → no-op", () => {
+		const work = initialVisualSubWork({
+			minuend: { ones_pl: 3, tens_pl: 5, hundreds_pl: 0, thousands_pl: 0 },
+			subtrahend: { ones_pl: 7, tens_pl: 2, hundreds_pl: 0, thousands_pl: 0 },
+			numPlaces: 2,
+		});
+		const next = applySubCancel(work, "ones_pl", 2);
+		expect(next).toBe(work);
+	});
+
+	it("allows cancellation once enough borrow discs have been moved down", () => {
+		const work = initialVisualSubWork({
+			minuend: { ones_pl: 3, tens_pl: 5, hundreds_pl: 0, thousands_pl: 0 },
+			subtrahend: { ones_pl: 7, tens_pl: 2, hundreds_pl: 0, thousands_pl: 0 },
+			numPlaces: 2,
+		});
+		let withBorrow = applySubBorrowFrom(work, "tens_pl", 2);
+		for (let i = 0; i < 4; i++) {
+			withBorrow = applySubMoveBorrowDown(withBorrow, "ones_pl", 2);
+		}
+		const next = applySubCancel(withBorrow, "ones_pl", 2);
+		expect(next.columns.ones_pl.minuend).toBe(6);
+		expect(next.columns.ones_pl.subtrahend).toBe(6);
+		expect(next.columns.ones_pl.borrow).toBe(6);
+	});
+
 	it("guard: subtrahend=0 → no-op", () => {
 		const work = initialVisualSubWork({
 			minuend: { ones_pl: 5, tens_pl: 3, hundreds_pl: 0, thousands_pl: 0 },
@@ -169,36 +211,26 @@ describe("applySubCancel", () => {
 		expect(next.activeColumn).toBe(1);
 	});
 
-	it("auto-drains borrow when cancel drops minuend to 0 and borrow > 0", () => {
-		// Build via operations: ones minuend=1, subtrahend=3, then borrow from tens
-		// so ones gets borrow=10, minuend=1. Move 9 borrow manually → borrow=1, minuend=10.
-		// Cancel 10 times → minuend=0, subtrahend still >0, borrow=1 → auto-drain.
+	it("drops remaining borrow discs after cancellation is complete", () => {
 		const work = initialVisualSubWork({
-			minuend: { ones_pl: 1, tens_pl: 5, hundreds_pl: 0, thousands_pl: 0 },
-			subtrahend: { ones_pl: 11, tens_pl: 2, hundreds_pl: 0, thousands_pl: 0 },
+			minuend: { ones_pl: 3, tens_pl: 5, hundreds_pl: 0, thousands_pl: 0 },
+			subtrahend: { ones_pl: 7, tens_pl: 2, hundreds_pl: 0, thousands_pl: 0 },
 			numPlaces: 2,
 		});
-		// Borrow: ones.borrow=10, ones.minuend=1 (minuend=1 ≠ 0 → no auto-drain yet)
-		let w = applySubBorrowFrom(work, "tens_pl", 2);
-		expect(w.columns.ones_pl.borrow).toBe(10);
-		expect(w.columns.ones_pl.minuend).toBe(1);
 
-		// Move 9 borrow discs manually: borrow=1, minuend=10
-		for (let i = 0; i < 9; i++) {
+		let w = applySubBorrowFrom(work, "tens_pl", 2);
+		for (let i = 0; i < 5; i++) {
 			w = applySubMoveBorrowDown(w, "ones_pl", 2);
 		}
-		expect(w.columns.ones_pl.borrow).toBe(1);
-		expect(w.columns.ones_pl.minuend).toBe(10);
 
-		// Cancel 10 times: minuend → 0, subtrahend → 1. Then borrow=1 → auto-drain.
-		for (let i = 0; i < 10; i++) {
+		for (let i = 0; i < 7; i++) {
 			w = applySubCancel(w, "ones_pl", 2);
 		}
-		// auto-drain: borrow=0, minuend=1; subtrahend=1 → column not done
+
+		expect(w.columns.ones_pl.subtrahend).toBe(0);
 		expect(w.columns.ones_pl.borrow).toBe(0);
-		expect(w.columns.ones_pl.minuend).toBe(1);
-		expect(w.columns.ones_pl.subtrahend).toBe(1);
-		expect(w.activeColumn).toBe(0);
+		expect(w.columns.ones_pl.minuend).toBe(6);
+		expect(w.activeColumn).toBe(1);
 	});
 
 	it("sets solved=true when last column done", () => {

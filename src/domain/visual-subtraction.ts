@@ -21,16 +21,21 @@ export function canBorrowFrom(col: VisualSubColumnState): boolean {
 	return col.minuend > 0;
 }
 
-// If the active column's minuend is 0 but borrow > 0, automatically move all
-// borrow discs down so the student doesn't have to click each one individually.
+export function canCancelSub(col: VisualSubColumnState): boolean {
+	return col.minuend >= col.subtrahend && col.minuend > 0 && col.subtrahend > 0;
+}
+
+// Borrow discs stay visible in the borrow zone while the top row still has
+// enough discs to cancel against the subtrahend. Once the top row is empty or
+// cancellation is complete, move the remaining borrow discs down automatically.
 function autoDrainBorrow(work: VisualSubWorkState): VisualSubWorkState {
 	const activePlace = PLACES[work.activeColumn];
 	if (!activePlace) return work;
 	const col = work.columns[activePlace];
-	if (col.minuend !== 0 || col.borrow <= 0) return work;
+	if (col.borrow <= 0 || (col.minuend !== 0 && col.subtrahend !== 0)) return work;
 	const newCol: VisualSubColumnState = {
 		...col,
-		minuend: col.borrow,
+		minuend: col.minuend + col.borrow,
 		borrow: 0,
 	};
 	return { ...work, columns: { ...work.columns, [activePlace]: newCol } };
@@ -98,7 +103,7 @@ export function applySubCancel(
 	const index = PLACES.indexOf(place);
 	if (index !== work.activeColumn) return work;
 	const col = work.columns[place];
-	if (col.minuend <= 0 || col.subtrahend <= 0) return work;
+	if (!canCancelSub(col)) return work;
 
 	const newCol: VisualSubColumnState = {
 		...col,
